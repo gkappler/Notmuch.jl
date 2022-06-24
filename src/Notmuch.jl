@@ -14,39 +14,149 @@ end
 
 export notmuch_json, notmuch_search, notmuch_show, notmuch_tree, notmuch_count, notmuch_cmd
 
+export offlineimap!
+checkdir(x) = !isdir(x) && mkdir(x)
+function userENV!(; workdir= get(ENV,"NOTMUCHJL",pwd())
+                  , homes = joinpath(workdir, "home")
+                  , user = nothing)
+    ## @show user
+    if user === nothing 
+        paths = (workdir = workdir
+                 , home = ENV["NOHOME"] # ENV["NOTMUCHJL_HOME"]
+                 , maildir = ENV["NOMAILDIR"])
+    else
+        paths = (workdir = workdir
+                 , home = joinpath(homes,user)
+                 , maildir = joinpath(homes,user,"mail"))
+    end
+    ENV["HOME"] = paths.home
+    ENV["MAILDIR"] = paths.maildir
+    paths
+end
 
-function notmuch(x...)
-    read(notmuch_cmd(x...), String)
+function noENV!(; workdir= get(ENV,"NOTMUCHJL",pwd()))
+    paths = (workdir = workdir
+             , home = ENV["NOHOME"] # ENV["NOTMUCHJL_HOME"]
+             , maildir = ENV["NOMAILDIR"])
+    ENV["HOME"] = paths.home
+    ENV["MAILDIR"] = paths.maildir
+    cd(paths.workdir)
+    paths
+end
+
+"""
+    notmuch(x...;
+                 workdir= get(ENV,"NOTMUCH_ROOT",pwd())
+                 , homes = joinpath(workdir, "home")
+                 , user = nothing, kw...)
+
+Run `notmuch_cmd`, after `cd(home)` and returning `cd(workdir)`.
+(see [`userENV!`](@ref)).
+"""
+function notmuch(x...; kw...)
+    paths = userENV!(; kw...)
+    cd(paths.home)
+    r = try
+        read(notmuch_cmd("--config=.notmuch-config",x...), String)
+    catch e
+        @error "notmuch error" e
+    end
+    noENV!()
+    r
 end
 
 
-function notmuch_cmd(command, x...)
+function offlineimap!(; kw...)
+    @show paths = userENV!(; kw...)
+    cd(paths.home)
+    r = try
+        read(`offlineimap -c .offlineimaprc`, String)
+    catch e
+        @error "offlineimap error" e
+    end
+    rnew = read(notmuch_cmd("new"),String)
+    noENV!()
+    (r, rnew)
+end
+
+
+
+"""
+    notmuch_cmd(command, x...; user=nothing)
+
+
+!!! note
+    running the command as a different user (`user !== nothing`) 
+    is untested:
+    `sudo -u \$user -i ...`
+"""
+function notmuch_cmd(command, x...; user=nothing)
     y = [x...]
-    @show c = `/usr/bin/notmuch $command $y`
+    if user===nothing
+        `/usr/bin/notmuch $command $y`
+    else
+        `sudo -u $user -i /usr/bin/notmuch $command $y`
+    end
 end
 
-notmuch_json(command,x...) = 
-    JSON3.read(notmuch(command, "--format=json", x...))
+##export notmuch
+##notmuch(command,x...; kw...) = read(notmuch(command, x...; kw...), String)
 
-notmuch_search(x...; limit=50) =
-    notmuch_json(:search, "--limit=$limit",x...)
+notmuch_json(command,x...; kw...) = 
+    JSON3.read(notmuch(command, "--format=json", x...; kw...))
 
-function notmuch_tree(x...)
-    #search = "(" * join(x,") and (") * ")"
-    # notmuch_json(:show, "--body=false", "--entire-thread", x...)
-    notmuch_show("--body=false", "--entire-thread", x...)
+function notmuch_count(x...; kw...)
+    c = notmuch("count", x...; kw...)
+    parse(Int,chomp(c))
+end
+
+export notmuch_search
+include("Threads.jl")
+
+notmuch_search(T::Type, x...; kw...) = T.(notmuch_search(x...; kw...))
+notmuch_search(x...; offset=0, limit=5, kw...) =
+    notmuch_json(:search, "--offset=$offset", "--limit=$limit", x...; kw...)
+
+notmuch_show(T::Type, x...; kw...) = T.(notmuch_show(x...; kw...))
+notmuch_show(x...; kw...) = notmuch_json(:show, x...; kw...)
+
+export notmuch_tree
+
+"""
+    notmuch_tree(x...)
+
+Parsimonous tree query for fetching structure with
+`notmuch_show("--body=false", "--entire-thread", x...; kw...)`
+"""
+function notmuch_tree(x...; kw...)
+    notmuch_show("--body=false", "--entire-thread", x...; kw...)
 end
 
 
-function notmuch_show(x...)
-    #search = "(" * join(x,") and (") * ")"
-    notmuch_json(:show, x...)
+
+export TagChange, notmuch_tag
+struct TagChange
+    prefix::String
+    tag::String
 end
 
-function notmuch_count(x...)
-    y = [x...]
-    @show c = `/usr/bin/notmuch count $y`
-    parse(Int,chomp(read(c, String)))
+function notmuch_tag(batch::Vector{Pair{String,TagChange}}; kw...)
+    open(
+        Notmuch.notmuch_cmd(
+            "tag", "--batch"; kw...
+        ),
+        "w", stdout) do io
+            for (q, tc) in batch
+                @info "tag $q" tc
+                # println(tc.prefix,
+                #         replace(tc.tag, " " => "%20")
+                #         , " -- ", q)
+                println(io, tc.prefix,
+                        replace(tc.tag, " " => "%20")
+                        , " -- ", q)
+            end
+            # close(io)
+        end
 end
 
 export notmuch_insert
@@ -58,22 +168,8 @@ function notmuch_insert(mail; folder="juliatest")
 end
 
 
-function msmtp(
-    rfc;
-    ## todo: parse from file!
-    msmtp_sender = env_msmtp_sender(),
-    mail_dir = expanduser("~/.msmtpqueue"),
-    mail_file = Dates.format(now(),"yyyy-mm-dd-HH.MM.SS")
-    )
-    open(joinpath(mail_dir, "$mail_file.msmtp"), "w") do io
-        println(io, "-oi -f $msmtp_sender -t")
-    end
-    dt, tz = Dates.format(now(), DateFormat("e, d u Y HH:MM:SS")), get(ENV, "TIMEZONE", "+0100")
-    docs_ascii = print_order(MIME("text/ascii"), mail_orders)
-    docs_html = print_order(MIME("text/html"), mail_orders)
-    message_id = "" # "Message-ID: <>"
-    open(joinpath(mail_dir, "$mail_file.mail"), "w") do io
-        println(io, rfc)
-    end
-end
+
+using Dates
+
+
 end
