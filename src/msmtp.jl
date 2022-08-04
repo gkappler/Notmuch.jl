@@ -1,15 +1,18 @@
 export msmtp_runqueue!
 
 function msmtp_runqueue!(; kw...)
-    paths = userENV!(; kw...)
-    cd(paths.workdir)
+    @show env = userENV(; kw...)
     r = try
-        read(`./msmtp-runqueue.sh -C $(paths.maildir)/.msmtprc`, String)
+        h = joinpath(env["HOME"], ".msmtprc")
+        cmd = Cmd(`./msmtp-runqueue.sh -C $h`;
+            env=env
+            )
+        @info "msmtp" cmd
+        read(cmd,  String)
     catch e
-        @error "offlineimap error" e
+        @error "msmtp-runqueue.sh error" e
     end
-    noENV!()
-    r
+    @show r
 end
 
 function msmtp(
@@ -28,8 +31,9 @@ function msmtp(
         println(io, "-oi -f $msmtp_sender -t")
     end
     dt, tz = Dates.format(now(), DateFormat("e, d u Y HH:MM:SS")), get(ENV, "TIMEZONE", "+0100")
-    @info "sendme" rfc
-    open(joinpath(mail_dir, "$mail_file.mail"), "w") do io
+    mailfile = joinpath(mail_dir, "$mail_file.mail")
+    @info "send" mailfile rfc
+    open(mailfile, "w") do io
         println(io, rfc)
     end
 end

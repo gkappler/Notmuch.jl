@@ -64,7 +64,10 @@ struct Email
     crypto::Vector{String}
     headers::Headers
 end
-
+Email(Nothing) = nothing
+Email(o::JSON3.Object) =
+    Email((showfield(Val{k}(), get(o,"$k",nothing))
+           for k in fieldnames(Email))...)
 
 function Base.show(io::IO, x::Email)
     ae = author_email(x.headers.From)
@@ -74,10 +77,11 @@ function Base.show(io::IO, x::Email)
     end
     println(io)
     printstyled(io, x.headers.Subject; bold=true, underline=true)
-    print(io, "       ", x.date_relative, " ")
+    print(io, "       ", x.date_relative)
     for c in x.body
         print(io, "\n", c)
     end
+    println(io)
 end
 
 showfield(::Val, x::Union{AbstractString, Bool, Number}) = x
@@ -100,7 +104,7 @@ struct WithReplies{M,R}
     #     m
     # WithReplies(m::Email, x::Nothing) =
     #     m
-    WithReplies(m::Email, x::Vector) =
+    WithReplies(m::Union{Email, Nothing}, x::Vector) =
         isempty(x) ? m : new{typeof(m), typeof(x)}(m,x)
     # WithReplies(x::Vector{<:Vector}) =
     #     WithReplies.(x)
@@ -120,7 +124,7 @@ struct WithReplies{M,R}
     # WithReplies(m::WithReplies, x::AbstractVector) =
     #     [m,x...]
 end
-WithReplies(m::Email, x::Union{WithReplies,Email}) =
+WithReplies(m::Union{Email, Nothing}, x::Union{WithReplies,Email}) =
     WithReplies(m, [x])
 
 
@@ -173,36 +177,37 @@ import AbstractTrees: printnode
 
 AbstractTrees.printnode(io::IO, x::WithReplies) =
     show(io,x.message)
+AbstractTrees.printnode(io::IO, x::WithReplies{Nothing}) =
+    nothing
+AbstractTrees.printnode(io::IO, x::Nothing) =
+    nothing
 AbstractTrees.children(x::WithReplies) =
     x.replies
 
 
-Emails(x::Nothing) = nothing
-function Emails(x::AbstractVector)
-    isempty(x) && return nothing
-    if x[1] isa JSON3.Object
-        o, c = x
-        try
-        s = Email((showfield(Val{k}(), get(o,"$k",nothing))
-                  for k in fieldnames(Email))...)
+function withReply(x)
+    o, c = x
+    try
+        s = Email(o)
         if isempty(c)
             s
         else
             ##@info "show" s length(c)
-            WithReplies(s,Emails(c))
+            WithReplies(s,Emails.(c))
         end
-        catch e
-            @info "failed $e" x e
-            readline()
-        end
+    catch e
+        @info "failed $e" x e
+        readline()
+    end
+end
+
+Emails(x::Nothing) = nothing
+function Emails(x::AbstractVector)
+    isempty(x) && return nothing
+    if length(x) == 2 && ( x[1] isa Union{Nothing,JSON3.Object} )
+        withReply(x)
     else
-        r = filter(x->x !== nothing,Emails.(x))
-        if length(r) == 1
-            ##@show typeof(x[1])
-            r[1]
-        else
-            r
-        end
+        Emails.(x)
     end
 end
 export Emails
