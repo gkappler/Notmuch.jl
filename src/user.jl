@@ -33,7 +33,7 @@ export offlineimap!
 """
     offlineimap!(; cfg = ".offlineimaprc", kw...)
 
-Run system Cmd `offlineimap` and then [`notmuch_new`](@ref).
+Run system Cmd `offlineimap` and then [`notmuch`](@ref)`("new").
 Returns output of both.
 
 For user `kw...` see [`userENV`](@ref).
@@ -45,7 +45,6 @@ function offlineimap!(; cfg = ".offlineimaprc", kw...)
     catch e
         @error "offlineimap error" e
     end
-    rnew = read(notmuch_cmd("new"; kw...),String)
-    ##noENV!()
+    rnew = notmuch("new"; kw...)
     (offlineimap = r, notmuch_new = rnew)
 end

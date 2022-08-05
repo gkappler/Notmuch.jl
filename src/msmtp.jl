@@ -24,23 +24,26 @@ function msmtp_runqueue!(; kw...)
 end
 
 """
-    msmtp(rfc; msmtp_sender = env_msmtp_sender(),  mail_file = Dates.format(now(),"yyyy-mm-dd-HH.MM.SS"),  kw... )
+    msmtp(rfc; msmtp_sender = env_msmtp_sender(),  mailfile = Dates.format(now(),"yyyy-mm-dd-HH.MM.SS"),  kw... )
 
-Write `rfc` formatted mail to a `\$mail_file.mail` in `joinpath(env["HOME"], ".msmtpqueue")`
-and msmtp arguments "-oi -f \$msmtp_sender -t" for sending in joinpath(mail_dir, "\$mail_file.msmtp").
+Write `rfc` formatted mail for sending to a `\$mailfile.mail` in `joinpath(env["HOME"], ".msmtpqueue")` 
+and msmtp arguments in `\$mailfile.msmtp`
+
+    -oi -f \$msmtp_sender -t
 
 For user `kw...` see [`userENV`](@ref).
 
 todo: `msmtp_sender` should be parsed from `rfc` content!
 """
-function msmtp(rfc; msmtp_sender = env_msmtp_sender(), mail_file = Dates.format(now(),"yyyy-mm-dd-HH.MM.SS"),  kw... )
+function msmtp(rfc; msmtp_sender = env_msmtp_sender(),
+               mailfile = Dates.format(now(),"yyyy-mm-dd-HH.MM.SS"), kw... )
     env = userENV(; kw...)
     mail_dir = joinpath(env["HOME"], ".msmtpqueue")
-    open(joinpath(mail_dir, "$mail_file.msmtp"), "w") do io
+    open(joinpath(mail_dir, "$mailfile.msmtp"), "w") do io
         println(io, "-oi -f $msmtp_sender -t")
     end
     dt, tz = Dates.format(now(), DateFormat("e, d u Y HH:MM:SS")), get(ENV, "TIMEZONE", "+0100")
-    mailfile = joinpath(mail_dir, "$mail_file.mail")
+    mailfile = joinpath(mail_dir, "$mailfile.mail")
     open(mailfile, "w") do io
         println(io, rfc)
     end

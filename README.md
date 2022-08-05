@@ -3,6 +3,7 @@ EditURL = "<unknown>/README.jl"
 ```
 
 # `Notmuch.jl`
+[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://gkappler.github.io/Notmuch.jl/dev/)
 
 is a julia wrapper for [notmuch mail](https://notmuchmail.org/) indexer that supports arbitrary tags and advanced search.
 
