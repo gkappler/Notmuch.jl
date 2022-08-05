@@ -1,38 +1,46 @@
 export msmtp_runqueue!
 
+"""
+    msmtp_runqueue!(; kw...)
+
+Send all messages with `./msmtp-runqueue.sh` with 
+config file set to `joinpath(env["HOME"], ".msmtprc")`.
+
+For user `kw...` see [`userENV`](@ref).
+"""
 function msmtp_runqueue!(; kw...)
-    @show env = userENV(; kw...)
+    env = userENV(; kw...)
     r = try
         h = joinpath(env["HOME"], ".msmtprc")
         cmd = Cmd(`./msmtp-runqueue.sh -C $h`;
             env=env
             )
-        @info "msmtp" cmd
+        @debug "sending msmtp..." cmd
         read(cmd,  String)
     catch e
         @error "msmtp-runqueue.sh error" e
     end
-    @show r
+    r
 end
 
-function msmtp(
-    rfc;
-    ## todo: parse from file!
-    msmtp_sender = env_msmtp_sender(),
-    mail_file = Dates.format(now(),"yyyy-mm-dd-HH.MM.SS"),
-    user = nothing,
-    mail_dir = if user !== nothing
-        joinpath(ENV["HOMES"], user, ".msmtpqueue")
-    else
-        expanduser("~/.msmtpqueue")
-    end
-    )
+"""
+    msmtp(rfc; msmtp_sender = env_msmtp_sender(),  mail_file = Dates.format(now(),"yyyy-mm-dd-HH.MM.SS"),  kw... )
+
+Write `rfc` formatted mail to a `\$mail_file.mail` in `joinpath(env["HOME"], ".msmtpqueue")`
+and msmtp arguments "-oi -f \$msmtp_sender -t" for sending in joinpath(mail_dir, "\$mail_file.msmtp").
+
+For user `kw...` see [`userENV`](@ref).
+
+todo: `msmtp_sender` should be parsed from `rfc` content!
+"""
+function msmtp(rfc; msmtp_sender = env_msmtp_sender(), mail_file = Dates.format(now(),"yyyy-mm-dd-HH.MM.SS"),  kw... )
+    env = userENV(; kw...)
+    mail_dir = joinpath(env["HOME"], ".msmtpqueue")
     open(joinpath(mail_dir, "$mail_file.msmtp"), "w") do io
         println(io, "-oi -f $msmtp_sender -t")
     end
     dt, tz = Dates.format(now(), DateFormat("e, d u Y HH:MM:SS")), get(ENV, "TIMEZONE", "+0100")
     mailfile = joinpath(mail_dir, "$mail_file.mail")
-    @info "send" mailfile rfc
     open(mailfile, "w") do io
         println(io, rfc)
     end

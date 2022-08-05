@@ -2,21 +2,31 @@
 EditURL = "<unknown>/README.jl"
 ```
 
-# Notmuch.jl
+# `Notmuch.jl`
 
-is a julia wrapper for [notmuch mail](https://notmuchmail.org/) indexer (that supports arbitrary tags and advanced search).
-Notmuch mail indexes emails into a xapian database.
-Emails need to be stored in maildir standard.
-- maildir can be smoothly synchronized with an IMAP server by [offlineimap](http://www.offlineimap.org/).
-- maildir is an archiving standard for email datasets. `Notmuch.jl` opens such email data up for analyses in Julia.
+is a julia wrapper for [notmuch mail](https://notmuchmail.org/) indexer that supports arbitrary tags and advanced search.
 
+Notmuch mail indexes emails into a xapian database from a maildir store.
+
+maildir 
+- is an standard for email datasets.
+- can be smoothly synchronized with an IMAP server by [offlineimap](http://www.offlineimap.org/).
+
+`Notmuch.jl` opens maildir email data up for analyses in Julia.
+
+## Prerequisites
+
+## Support of Multiple Maildirs
 On linux with a `notmuch` setup your user mails are searched by default.
-Keyword argument `user` switches the `maildir` (and database) to
+`Notmuch.jl` functions support keyword argument `user` to switch the `maildir` (and database) to
 `joinpath(ENV["NOTMUCHJL"],"home")`.
 
-(Please note, that this package is a prerelease, and such names might still change.)
+Please note, that this package is a prerelease to incorporate community feedback, and these names might change.
+
 
 If you do not have notmuch installed, you can use `docker-compose` to run a dockerized version (inconvenient for a REPL, but convenient for using the HTTP Api).
+
+
 ## Counts
 
 ````julia
