@@ -2,6 +2,7 @@ using Documenter
 using Notmuch
 
 DocMeta.setdocmeta!(Notmuch, :DocTestSetup, quote
+                        using Notmuch
                         ENV["NOTMUCHJL"] = "/mnt/windows/elmail"
                         ENV["MAILDIR"] = "/home/gregor"
                         ENV["NOHOME"] = "/home/gregor"
@@ -13,9 +14,6 @@ makedocs(
     modules = [Notmuch]
 )
 
-# Documenter can also automatically deploy documentation to gh-pages.
-# See "Hosting Documentation" and deploydocs() in the Documenter manual
-# for more information.
-#=deploydocs(
-    repo = "<repository url>"
-)=#
+deploydocs(
+    repo = "github.com/gkappler/Notmuch.jl.git",
+)
