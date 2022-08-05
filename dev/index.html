@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Notmuch.jl · Notmuch</title><script data-outdated-warner src="assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.045/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.24/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="assets/documenter.js"></script><script src="siteinfo.js"></script><script src="../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href>Notmuch</a></span></div><form class="docs-search" action="search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li class="is-active"><a class="tocitem" href>Notmuch.jl</a><ul class="internal"><li><a class="tocitem" href="#Notmuch-wrappers"><span>Notmuch wrappers</span></a></li><li><a class="tocitem" href="#Tagging"><span>Tagging</span></a></li><li><a class="tocitem" href="#Multiple-users"><span>Multiple users</span></a></li><li><a class="tocitem" href="#OfflineImap-and-MSMTP"><span>OfflineImap and MSMTP</span></a></li><li><a class="tocitem" href="#Helpers"><span>Helpers</span></a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Notmuch.jl</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Notmuch.jl</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/gkappler/Notmuch.jl/blob/main/docs/src/index.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Notmuch.jl"><a class="docs-heading-anchor" href="#Notmuch.jl">Notmuch.jl</a><a id="Notmuch.jl-1"></a><a class="docs-heading-anchor-permalink" href="#Notmuch.jl" title="Permalink"></a></h1><h2 id="Notmuch-wrappers"><a class="docs-heading-anchor" href="#Notmuch-wrappers">Notmuch wrappers</a><a id="Notmuch-wrappers-1"></a><a class="docs-heading-anchor-permalink" href="#Notmuch-wrappers" title="Permalink"></a></h2><article class="docstring"><header><a class="docstring-binding" id="Notmuch" href="#Notmuch"><code>Notmuch</code></a> — <span class="docstring-category">Module</span></header><section><div><p><code>Notmuch.jl</code> opens maildir email data up for analyses in Julia by providing a julia <code>Cmd</code> wrapper for <a href="https://notmuchmail.org/">notmuch mail</a> database supporting arbitrary tags and advanced search.</p><p>Notmuch mail indexes emails into a xapian database from a maildir store.</p><p>maildir </p><ul><li>is an standard for email datasets.</li><li>can be smoothly synchronized with an IMAP server by <a href="http://www.offlineimap.org/">offlineimap</a>.</li></ul><p>Genie routes are provided exposing notmuch search as an HTTP API.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/gkappler/Notmuch.jl/blob/ce82b45610e1ea263d5cf7ef5e738690552dad4f/src/Notmuch.jl#L1-L12">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Notmuch.notmuch_cmd" href="#Notmuch.notmuch_cmd"><code>Notmuch.notmuch_cmd</code></a> — <span class="docstring-category">Function</span></header><section><div><pre><code class="language-julia hljs">notmuch_cmd(command, x...; log=false, kw...)</code></pre><p>Build notmuch <code>command</code> with arguments <code>x...</code>.</p><p>For user <code>kw...</code> see <a href="#Notmuch.userENV"><code>userENV</code></a>.</p><p>Used in <a href="#Notmuch.notmuch_json"><code>notmuch_json</code></a> and  <a href="#Notmuch.notmuch"><code>notmuch</code></a>.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/gkappler/Notmuch.jl/blob/ce82b45610e1ea263d5cf7ef5e738690552dad4f/src/Notmuch.jl#L41-L49">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Notmuch.notmuch" href="#Notmuch.notmuch"><code>Notmuch.notmuch</code></a> — <span class="docstring-category">Function</span></header><section><div><pre><code class="language-julia hljs">notmuch(x...; kw...)</code></pre><p>Run <a href="#Notmuch.notmuch_cmd"><code>notmuch_cmd</code></a> and return output as <code>String</code>.</p><p>See <a href="#Notmuch.notmuch_json"><code>notmuch_json</code></a> To get json as a String, provide <code>&quot;--format=json&quot;</code> as argument.</p><p>For user <code>kw...</code> see <a href="#Notmuch.userENV"><code>userENV</code></a>.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/gkappler/Notmuch.jl/blob/ce82b45610e1ea263d5cf7ef5e738690552dad4f/src/Notmuch.jl#L61-L70">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Notmuch.notmuch_json" href="#Notmuch.notmuch_json"><code>Notmuch.notmuch_json</code></a> — <span class="docstring-category">Function</span></header><section><div><pre><code class="language-julia hljs">notmuch_json(command,x...; kw...)</code></pre><p>Parse <a href="#Notmuch.notmuch"><code>notmuch</code></a> with <code>JSON3.read</code>.</p><p>For user <code>kw...</code> see <a href="#Notmuch.userENV"><code>userENV</code></a>.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/gkappler/Notmuch.jl/blob/ce82b45610e1ea263d5cf7ef5e738690552dad4f/src/Notmuch.jl#L81-L87">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Notmuch.notmuch_count" href="#Notmuch.notmuch_count"><code>Notmuch.notmuch_count</code></a> — <span class="docstring-category">Function</span></header><section><div><pre><code class="language-julia hljs">notmuch_count(x...; kw...)</code></pre><p>from the man-page:</p><p>count messages matching the given search terms</p><pre><code class="nohighlight hljs">   The number of matching messages (or threads) is output to stdout.
+
+   With no search terms, a count of all messages (or threads) in the data‐
+   base will be displayed.
+
+   See notmuch-search-terms(7) for details of  the  supported  syntax  for
+   &lt;search-terms&gt;.
+
+   Supported options for count include
+
+   --output=(messages|threads|files)
+
+          messages
+                 Output  the  number of matching messages. This is the de‐
+                 fault.
+
+          threads
+                 Output the number of matching threads.
+
+          files  Output the number of files associated with matching  mes‐
+                 sages.  This  may  be  bigger than the number of matching
+                 messages due to duplicates (i.e.  multiple  files  having
+                 the same message-id).
+
+   --exclude=(true|false)
+          Specify  whether  to  omit messages matching search.exclude_tags
+          from the count (the default) or not.
+
+   --batch
+          Read queries from a file (stdin by default), one per  line,  and
+          output  the  number of matching messages (or threads) to stdout,
+          one per line. On an empty input line the count of  all  messages
+          (or  threads) in the database will be output. This option is not
+          compatible with specifying search terms on the command line.
+
+   --lastmod
+          Append lastmod (counter for number of database updates) and UUID
+          to  the output. lastmod values are only comparable between data‐
+          bases with the same UUID.
+
+   --input=&lt;filename&gt;
+          Read input from given  file,  instead  of  from  stdin.  Implies
+          --batch.</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/gkappler/Notmuch.jl/blob/ce82b45610e1ea263d5cf7ef5e738690552dad4f/src/Notmuch.jl#L94-L144">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Notmuch.notmuch_search" href="#Notmuch.notmuch_search"><code>Notmuch.notmuch_search</code></a> — <span class="docstring-category">Function</span></header><section><div><pre><code class="language-julia hljs">notmuch_search(query, x...; offset=0, limit=5, kw...)
+notmuch_search(T::Union{Type,Function}, x...; kw...)</code></pre><p>Search notmuch and return threads json <code>Vector</code>.</p><p>With first argument <code>f::Union{Type,Function}</code> each result is converted with calling <code>f</code>, otherwise JSON is returned.</p><p>For user <code>kw...</code> see <a href="#Notmuch.userENV"><code>userENV</code></a>.</p><p>From the man page:</p><pre><code class="nohighlight hljs">   Search for messages matching the given search terms, and display as
+   results the threads containing the matched messages.
+
+   The output consists of one line per thread, giving a thread ID, the
+   date of the newest  (or  oldest,  depending  on  the  sort  option)
+   matched  message  in the thread, the number of matched messages and
+   total messages in the thread, the names of all participants in  the
+   thread, and the subject of the newest (or oldest) message.
+
+   See notmuch-search-terms(7) for details of the supported syntax for
+   &lt;search-terms&gt;.
+
+   Supported options for search include
+
+   --format=(json|sexp|text|text0)
+          Presents the results in either JSON, S-Expressions,  newline
+          character  separated plain-text (default), or null character
+          separated plain-text (compatible  with  xargs(1)  -0  option
+          where available).
+
+   --format-version=N
+          Use  the specified structured output format version. This is
+          intended for programs that invoke notmuch(1) internally.  If
+          omitted, the latest supported version will be used.
+
+   --output=(summary|threads|messages|files|tags)
+
+          summary
+                 Output  a  summary  of  each  thread with any message
+                 matching the search terms. The summary  includes  the
+                 thread ID, date, the number of messages in the thread
+                 (both the number matched and the total  number),  the
+                 authors  of  the  thread and the subject. In the case
+                 where a thread contains multiple files for some  mes‐
+                 sages, the total number of files is printed in paren‐
+                 theses (see below for an example).
+
+          threads
+                 Output the thread IDs of all threads with any message
+                 matching  the  search  terms,  either  one  per  line
+                 (--format=text), separated by null characters (--for‐
+                 mat=text0),  as  a  JSON array (--format=json), or an
+                 S-Expression list (--format=sexp).
+
+          messages
+                 Output the message IDs of all messages  matching  the
+                 search  terms,  either  one per line (--format=text),
+                 separated by null characters (--format=text0),  as  a
+                 JSON  array  (--format=json),  or  as an S-Expression
+                 list (--format=sexp).
+
+          files  Output the filenames of  all  messages  matching  the
+                 search  terms,  either  one per line (--format=text),
+                 separated by null characters (--format=text0),  as  a
+                 JSON  array  (--format=json),  or  as an S-Expression
+                 list (--format=sexp).
+
+                 Note that each message may  have  multiple  filenames
+                 associated  with  it. All of them are included in the
+                 output (unless limited  with  the  --duplicate=N  op‐
+                 tion). This may be particularly confusing for folder:
+                 or path: searches in a specified  directory,  as  the
+                 messages  may  have  duplicates  in other directories
+                 that are included in the output, although these files
+                 alone would not match the search.
+
+          tags   Output  all  tags that appear on any message matching
+                 the  search  terms,  either  one  per  line   (--for‐
+                 mat=text),   separated  by  null  characters  (--for‐
+                 mat=text0), as a JSON array (--format=json), or as an
+                 S-Expression list (--format=sexp).
+
+   --sort=(newest-first|oldest-first)
+          This option can be used to present results in either chrono‐
+          logical order (oldest-first) or reverse chronological  order
+          (newest-first).
+
+          Note:  The  thread  order will be distinct between these two
+          options (beyond being simply reversed). When sorting by old‐
+          est-first  the  threads will be sorted by the oldest message
+          in each thread, but when sorting by newest-first the threads
+          will be sorted by the newest message in each thread.
+
+          By default, results will be displayed in reverse chronologi‐
+          cal order, (that is, the newest results  will  be  displayed
+          first).
+
+   --offset=[-]N
+          Skip  displaying  the first N results. With the leading &#39;-&#39;,
+          start at the Nth result from the end.
+
+   --limit=N
+          Limit the number of displayed results to N.
+
+   --exclude=(true|false|all|flag)
+          A message is called &quot;excluded&quot; if it matches  at  least  one
+          tag  in  search.exclude_tags that does not appear explicitly
+          in the search terms. This option specifies whether  to  omit
+          excluded messages in the search process.
+
+          true (default)
+                 Prevent  excluded  messages  from matching the search
+                 terms.
+
+          all    Additionally prevent excluded messages from appearing
+                 in  displayed  results,  in effect behaving as though
+                 the excluded messages do not exist.
+
+          false  Allow excluded messages to match search terms and ap‐
+                 pear  in  displayed  results.  Excluded  messages are
+                 still marked in the relevant outputs.
+
+          flag   Only has an effect when --output=summary. The  output
+                 is  almost  identical to false, but the &quot;match count&quot;
+                 is the number of matching  non-excluded  messages  in
+                 the  thread,  rather than the number of matching mes‐
+                 sages.
+
+   --duplicate=N
+          For --output=files, output the Nth filename associated  with
+          each  message  matching  the  query  (N is 1-based). If N is
+          greater than the number of files associated  with  the  mes‐
+          sage, don&#39;t print anything.
+
+          For  --output=messages,  only output message IDs of messages
+          matching the search terms that have at least N filenames as‐
+          sociated with them.
+
+          Note  that this option is orthogonal with the folder: search
+          prefix. The prefix matches messages based on filenames. This
+          option filters filenames of the matching messages.</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/gkappler/Notmuch.jl/blob/ce82b45610e1ea263d5cf7ef5e738690552dad4f/src/Notmuch.jl#L155-L299">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Notmuch.notmuch_tree" href="#Notmuch.notmuch_tree"><code>Notmuch.notmuch_tree</code></a> — <span class="docstring-category">Function</span></header><section><div><pre><code class="language-julia hljs">notmuch_tree(x...; body = false, entire_thread=false, kw...)
+notmuch_tree(T::Union{Type,Function}, x...; kw...)</code></pre><p>Parsimonous tree query for fetching structure, convenience query for  <a href="#Notmuch.notmuch_show"><code>notmuch_show</code></a></p><p>With first argument <code>f::Union{Type,Function}</code> each result is converted with calling <code>f</code>, otherwise JSON is returned.</p><p>For user <code>kw...</code> see <a href="#Notmuch.userENV"><code>userENV</code></a>.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/gkappler/Notmuch.jl/blob/ce82b45610e1ea263d5cf7ef5e738690552dad4f/src/Notmuch.jl#L745-L755">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Notmuch.notmuch_address" href="#Notmuch.notmuch_address"><code>Notmuch.notmuch_address</code></a> — <span class="docstring-category">Function</span></header><section><div><pre><code class="language-julia hljs">notmuch_address(q, a...; target=1000, kw...)</code></pre><p>call <code>notmuch address</code>. Notmuch adress collection can take long and collect a long list of addresses when run on 100ks of messages. <code>notmuch_address</code> does a binary search to limits the time range to match <code>target</code> messages. </p><p>TODO: currently the maximum date is fixed, and the most recent <code>target</code> commands are returned.</p><p>From the man page:</p><pre><code class="nohighlight hljs">   Search  for  messages  matching the given search terms, and display
+   the addresses from them. Duplicate addresses are filtered out.
+
+   See notmuch-search-terms(7) for details of the supported syntax for
+   &lt;search-terms&gt;.
+
+   Supported options for address include
+
+   --format=(json|sexp|text|text0)
+          Presents  the results in either JSON, S-Expressions, newline
+          character separated plain-text (default), or null  character
+          separated  plain-text  (compatible  with  xargs(1) -0 option
+          where available).
+
+   --format-version=N
+          Use the specified structured output format version. This  is
+          intended  for programs that invoke notmuch(1) internally. If
+          omitted, the latest supported version will be used.
+
+   --output=(sender|recipients|count|address)
+          Controls which information appears in the output.  This  op‐
+          tion  can  be given multiple times to combine different out‐
+          puts.  When neither --output=sender nor  --output=recipients
+          is given, --output=sender is implied.
+
+          sender Output all addresses from the From header.
+
+                 Note: Searching for sender should be much faster than
+                 searching for recipients,  because  sender  addresses
+                 are cached directly in the database whereas other ad‐
+                 dresses need to be fetched from message files.
+
+          recipients
+                 Output all addresses from the To, Cc and Bcc headers.
+
+          count  Print the count of how many times was the address en‐
+                 countered during search.
+
+                 Note:  With  this  option, addresses are printed only
+                 after the whole search is  finished.  This  may  take
+                 long time.
+
+          address
+                 Output  only  the email addresses instead of the full
+                 mailboxes with names and email addresses. This option
+                 has no effect on the JSON or S-Expression output for‐
+                 mats.
+
+   --deduplicate=(no|mailbox|address)
+          Control the deduplication of results.
+
+          no     Output all occurrences of addresses in  the  matching
+                 messages. This is not applicable with --output=count.
+
+          mailbox
+                 Deduplicate  addresses based on the full, case sensi‐
+                 tive name and email address, or mailbox. This is  ef‐
+                 fectively  the  same  as  piping the --deduplicate=no
+                 output to sort | uniq, except for the  order  of  re‐
+                 sults. This is the default.
+
+          address
+                 Deduplicate  addresses  based on the case insensitive
+                 address part of the  mailbox.  Of  all  the  variants
+                 (with  different  name or case), print the one occur‐
+                 ring most frequently among the matching messages.  If
+                 --output=count  is specified, include all variants in
+                 the count.
+
+   --sort=(newest-first|oldest-first)
+          This option can be used to present results in either chrono‐
+          logical  order (oldest-first) or reverse chronological order
+          (newest-first).
+
+          By default, results will be displayed in reverse chronologi‐
+          cal  order,  (that  is, the newest results will be displayed
+          first).
+
+          However, if either --output=count  or  --deduplicate=address
+          is  specified,  this  option is ignored and the order of the
+          results is unspecified.
+
+   --exclude=(true|false)
+          A message is called &quot;excluded&quot; if it matches  at  least  one
+          tag  in  search.exclude_tags that does not appear explicitly
+          in the search terms. This option specifies whether  to  omit
+          excluded messages in the search process.
+
+          The  default  value,  true,  prevents excluded messages from
+          matching the search terms.
+
+          false allows excluded messages to match search terms and ap‐
+          pear in displayed results.</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/gkappler/Notmuch.jl/blob/ce82b45610e1ea263d5cf7ef5e738690552dad4f/src/Notmuch.jl#L401-L506">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Notmuch.notmuch_show" href="#Notmuch.notmuch_show"><code>Notmuch.notmuch_show</code></a> — <span class="docstring-category">Function</span></header><section><div><pre><code class="language-julia hljs">notmuch_show(query, x...; body = true, entire_thread=false, kw...)
+notmuch_show(T::Union{Type,Function}, x...; kw...)</code></pre><p>Return <code>notmuch show</code>.</p><p>With first argument <code>f::Union{Type,Function}</code> each result is converted with calling <code>f</code>, otherwise JSON is returned.</p><p>For user <code>kw...</code> see <a href="#Notmuch.userENV"><code>userENV</code></a>.</p><p>From the man page:        Shows all messages matching the search terms.</p><pre><code class="nohighlight hljs">   See notmuch-search-terms(7) for details of the supported syntax for
+   &lt;search-terms&gt;.
+
+   The messages will be grouped and sorted based on the threading (all
+   replies  to a particular message will appear immediately after that
+   message in date order). The output is not indented by default,  but
+   depth  tags are printed so that proper indentation can be performed
+   by a post-processor (such as the emacs interface to notmuch).
+
+   Supported options for show include
+
+   --entire-thread=(true|false)
+          If true, notmuch show outputs all messages in the thread  of
+          any  message matching the search terms; if false, it outputs
+          only the matching messages.  For  --format=json  and  --for‐
+          mat=sexp  this defaults to true. For other formats, this de‐
+          faults to false.
+
+   --format=(text|json|sexp|mbox|raw)
+
+          text (default for messages)
+                 The default plain-text format  has  all  text-content
+                 MIME parts decoded. Various components in the output,
+                 (message, header, body, attachment, and  MIME  part),
+                 will  be  delimited  by  easily-parsed  markers. Each
+                 marker consists of a Control-L character (ASCII deci‐
+                 mal  12),  the name of the marker, and then either an
+                 opening or closing brace, (&#39;{&#39;  or  &#39;}&#39;),  to  either
+                 open  or  close  the  component. For a multipart MIME
+                 message, these parts will be nested.
+
+          json   The output is formatted with Javascript Object  Nota‐
+                 tion (JSON). This format is more robust than the text
+                 format for automated processing. The nested structure
+                 of  multipart  MIME  messages  is reflected in nested
+                 JSON output. By default JSON output includes all mes‐
+                 sages  in  a  matching  thread;  that is, by default,
+                 --format=json sets --entire-thread.  The  caller  can
+                 disable    this    behaviour    by    setting   --en‐
+                 tire-thread=false.  The JSON output is always encoded
+                 as UTF-8 and any message content included in the out‐
+                 put will be charset-converted to UTF-8.
+
+          sexp   The output is  formatted  as  the  Lisp  s-expression
+                 (sexp)  equivalent  of the JSON format above. Objects
+                 are formatted as property lists whose keys  are  key‐
+                 words  (symbols preceded by a colon). True is format‐
+                 ted as t and both false and  null  are  formatted  as
+                 nil.  As  for JSON, the s-expression output is always
+                 encoded as UTF-8.
+
+          mbox   All matching messages are output in the  traditional,
+                 Unix  mbox format with each message being prefixed by
+                 a line beginning with &quot;From &quot; and a blank line  sepa‐
+                 rating each message. Lines in the message content be‐
+                 ginning with &quot;From &quot; (preceded by zero  or  more  &#39;&gt;&#39;
+                 characters)  have  an additional &#39;&gt;&#39; character added.
+                 This reversible escaping is  termed  &quot;mboxrd&quot;  format
+                 and described in detail here:
+                    http://homepage.ntlworld.com/jonathan.deboynepollard/FGA/mail-mbox-formats.html
+
+          raw (default if --part is given)
+                 Write the raw bytes of the given MIME part of a  mes‐
+                 sage to standard out. For this format, it is an error
+                 to specify a query that matches more  than  one  mes‐
+                 sage.
+
+                 If  the  specified  part is a leaf part, this outputs
+                 the body of the part after performing content  trans‐
+                 fer  decoding  (but  no  charset conversion). This is
+                 suitable for saving attachments, for example.
+
+                 For a multipart or message part, the output  includes
+                 the  part  headers as well as the body (including all
+                 child parts). No decoding is performed because multi‐
+                 part  and  message parts cannot have non-trivial con‐
+                 tent transfer encoding. Consumers of this may need to
+                 implement MIME decoding and similar functions.
+
+   --format-version=N
+          Use  the specified structured output format version. This is
+          intended for programs that invoke notmuch(1) internally.  If
+          omitted, the latest supported version will be used.
+
+   --part=N
+          Output  the  single decoded MIME part N of a single message.
+          The search terms must match only a single  message.  Message
+          parts are numbered in a depth-first walk of the message MIME
+          structure, and are  identified  in  the  &#39;json&#39;,  &#39;sexp&#39;  or
+          &#39;text&#39; output formats.
+
+          Note  that even a message with no MIME structure or a single
+          body part still has two MIME parts: part 0 is the whole mes‐
+          sage (headers and body) and part 1 is just the body.
+
+   --verify
+          Compute  and  report  the validity of any MIME cryptographic
+          signatures found in  the  selected  content  (e.g.,  &quot;multi‐
+          part/signed&quot;  parts).  Status  of  the signature will be re‐
+          ported (currently  only  supported  with  --format=json  and
+          --format=sexp),  and  the  multipart/signed part will be re‐
+          placed by the signed data.
+
+   --decrypt=(false|auto|true|stash)
+          If true, decrypt any MIME encrypted parts found in  the  se‐
+          lected  content  (e.g., &quot;multipart/encrypted&quot; parts). Status
+          of the decryption will be reported (currently only supported
+          with  --format=json and --format=sexp) and on successful de‐
+          cryption the multipart/encrypted part will  be  replaced  by
+          the decrypted content.
+
+          stash  behaves  like true, but upon successful decryption it
+          will also stash the message&#39;s session key in  the  database,
+          and  index  the cleartext of the message, enabling automatic
+          decryption in the future.
+
+          If auto, and a session key is already known for the message,
+          then  it  will be decrypted, but notmuch will not try to ac‐
+          cess the user&#39;s keys.
+
+          Use false to avoid even automatic decryption.
+
+          Non-automatic decryption (stash or true, in the absence of a
+          stashed  session  key) expects a functioning gpg-agent(1) to
+          provide any needed credentials. Without one, the  decryption
+          will fail.
+
+          Note: setting either true or stash here implies --verify.
+
+          Here is a table that summarizes each of these policies:
+
+                  ┌─────────────┬───────┬──────┬──────┬───────┐
+                  │             │ false │ auto │ true │ stash │
+                  ├─────────────┼───────┼──────┼──────┼───────┤
+                  │Show cleart‐ │       │ X    │ X    │ X     │
+                  │ext if  ses‐ │       │      │      │       │
+                  │sion  key is │       │      │      │       │
+                  │already      │       │      │      │       │
+                  │known        │       │      │      │       │
+                  ├─────────────┼───────┼──────┼──────┼───────┤
+                  │Use   secret │       │      │ X    │ X     │
+                  │keys to show │       │      │      │       │
+                  │cleartext    │       │      │      │       │
+                  ├─────────────┼───────┼──────┼──────┼───────┤
+                  │Stash    any │       │      │      │ X     │
+                  │newly recov‐ │       │      │      │       │
+                  │ered session │       │      │      │       │
+                  │keys,  rein‐ │       │      │      │       │
+                  │dexing  mes‐ │       │      │      │       │
+                  │sage      if │       │      │      │       │
+                  │found        │       │      │      │       │
+                  └─────────────┴───────┴──────┴──────┴───────┘
+
+          Note: --decrypt=stash requires write access to the database.
+          Otherwise, notmuch show operates entirely in read-only mode.
+
+          Default: auto
+
+   --exclude=(true|false)
+          Specify whether to omit  threads  only  matching  search.ex‐
+          clude_tags  from the search results (the default) or not. In
+          either case the excluded message will be marked with the ex‐
+          clude flag (except when output=mbox when there is nowhere to
+          put the flag).
+
+          If --entire-thread is specified then  complete  threads  are
+          returned  regardless  (with the excluded flag being set when
+          appropriate) but threads that only match in an excluded mes‐
+          sage are not returned when --exclude=true.
+
+          The default is --exclude=true.
+
+   --body=(true|false)
+          If  true  (the  default) notmuch show includes the bodies of
+          the messages in the output; if false,  bodies  are  omitted.
+          --body=false is only implemented for the text, json and sexp
+          formats and it is incompatible with --part &gt; 0.
+
+          This is useful if the  caller  only  needs  the  headers  as
+          body-less output is much faster and substantially smaller.
+
+   --include-html
+          Include  &quot;text/html&quot;  parts as part of the output (currently
+          only supported with --format=text, --format=json and  --for‐
+          mat=sexp).  By  default, unless --part=N is used to select a
+          specific part or  --include-html  is  used  to  include  all
+          &quot;text/html&quot;  parts, no part with content type &quot;text/html&quot; is
+          included in the output.
+
+   A common use of notmuch show is to display a single thread of email
+   messages.  For  this,  use a search term of &quot;thread:&lt;thread-id&gt;&quot; as
+   can be seen in the first column of output from the  notmuch  search
+   command.</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/gkappler/Notmuch.jl/blob/ce82b45610e1ea263d5cf7ef5e738690552dad4f/src/Notmuch.jl#L525-L733">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Notmuch.notmuch_insert" href="#Notmuch.notmuch_insert"><code>Notmuch.notmuch_insert</code></a> — <span class="docstring-category">Function</span></header><section><div><pre><code class="language-julia hljs">notmuch_insert(mail; folder=&quot;juliatest&quot;)</code></pre><p>Insert <code>mail</code> as a mail file into <code>notmuch</code> (see <code>notmuch insert</code>). Writes a file and changes tags in xapian.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/gkappler/Notmuch.jl/blob/ce82b45610e1ea263d5cf7ef5e738690552dad4f/src/Notmuch.jl#L844-L849">source</a></section></article><h2 id="Tagging"><a class="docs-heading-anchor" href="#Tagging">Tagging</a><a id="Tagging-1"></a><a class="docs-heading-anchor-permalink" href="#Tagging" title="Permalink"></a></h2><article class="docstring"><header><a class="docstring-binding" id="Notmuch.TagChange" href="#Notmuch.TagChange"><code>Notmuch.TagChange</code></a> — <span class="docstring-category">Type</span></header><section><div><pre><code class="language-julia hljs">TagChange(prefixtag::AbstractString)
+TagChange(prefix::AbstractString, tag::AbstractString)</code></pre><p>Prefix is either &quot;+&quot; for adding or &quot;-&quot; for removing a tag.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/gkappler/Notmuch.jl/blob/ce82b45610e1ea263d5cf7ef5e738690552dad4f/src/Notmuch.jl#L765-L770">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Notmuch.notmuch_tag" href="#Notmuch.notmuch_tag"><code>Notmuch.notmuch_tag</code></a> — <span class="docstring-category">Function</span></header><section><div><pre><code class="language-julia hljs">notmuch_tag(batch::Pair{&lt;:AbstractString,&lt;:AbstractString}...; kw...)
+notmuch_tag(batch::Vector{Pair{String,TagChange}}; kw...)</code></pre><p>Tag <code>query =&gt; tagchange</code> entries in <code>batch</code> mode.</p><p>Spaces in tags are supported, but other query string encodings for <a href="https://manpages.ubuntu.com/manpages//bionic/man1/notmuch-tag.1.html"><code>notmuch tag</code></a> are currently not.</p><p>For user <code>kw...</code> see <a href="#Notmuch.userENV"><code>userENV</code></a>.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/gkappler/Notmuch.jl/blob/ce82b45610e1ea263d5cf7ef5e738690552dad4f/src/Notmuch.jl#L786-L795">source</a></section></article><h2 id="Multiple-users"><a class="docs-heading-anchor" href="#Multiple-users">Multiple users</a><a id="Multiple-users-1"></a><a class="docs-heading-anchor-permalink" href="#Multiple-users" title="Permalink"></a></h2><article class="docstring"><header><a class="docstring-binding" id="Notmuch.userENV" href="#Notmuch.userENV"><code>Notmuch.userENV</code></a> — <span class="docstring-category">Function</span></header><section><div><pre><code class="language-julia hljs">userENV(; workdir= get(ENV,&quot;NOTMUCHJL&quot;,pwd()), homes = joinpath(workdir, &quot;home&quot;), user = nothing)</code></pre><p>Construct environment <code>Dict(&quot;HOME&quot; =&gt; joinpath(homes,user), &quot;MAILDIR&quot; =&gt; joinpath(homes,user,&quot;maildir&quot;))</code>.</p><p>If <code>user === nothing</code> use  <code>Dict(&quot;HOME&quot; =&gt; get(ENV,&quot;NOHOME&quot;,ENV[&quot;HOME&quot;]), &quot;MAILDIR&quot; =&gt; get(ENV,&quot;NOMAILDIR&quot;, ENV[&quot;MAILDIR&quot;]))</code>.</p><p>See <a href="#Notmuch.notmuch_cmd"><code>notmuch_cmd</code></a>, <a href="#Notmuch.offlineimap!"><code>offlineimap!</code></a>, and <a href="#Notmuch.msmtp_runqueue!"><code>msmtp_runqueue!</code></a></p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/gkappler/Notmuch.jl/blob/ce82b45610e1ea263d5cf7ef5e738690552dad4f/src/user.jl#L9-L18">source</a></section></article><h2 id="OfflineImap-and-MSMTP"><a class="docs-heading-anchor" href="#OfflineImap-and-MSMTP">OfflineImap and MSMTP</a><a id="OfflineImap-and-MSMTP-1"></a><a class="docs-heading-anchor-permalink" href="#OfflineImap-and-MSMTP" title="Permalink"></a></h2><article class="docstring"><header><a class="docstring-binding" id="Notmuch.msmtp_runqueue!" href="#Notmuch.msmtp_runqueue!"><code>Notmuch.msmtp_runqueue!</code></a> — <span class="docstring-category">Function</span></header><section><div><pre><code class="language-julia hljs">msmtp_runqueue!(; kw...)</code></pre><p>Send all messages with <code>./msmtp-runqueue.sh</code> with  config file set to <code>joinpath(env[&quot;HOME&quot;], &quot;.msmtprc&quot;)</code>.</p><p>For user <code>kw...</code> see <a href="#Notmuch.userENV"><code>userENV</code></a>.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/gkappler/Notmuch.jl/blob/ce82b45610e1ea263d5cf7ef5e738690552dad4f/src/msmtp.jl#L3-L10">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Notmuch.msmtp" href="#Notmuch.msmtp"><code>Notmuch.msmtp</code></a> — <span class="docstring-category">Function</span></header><section><div><pre><code class="language-julia hljs">msmtp(rfc; msmtp_sender = env_msmtp_sender(),  mail_file = Dates.format(now(),&quot;yyyy-mm-dd-HH.MM.SS&quot;),  kw... )</code></pre><p>Write <code>rfc</code> formatted mail to a <code>$mail_file.mail</code> in <code>joinpath(env[&quot;HOME&quot;], &quot;.msmtpqueue&quot;)</code> and msmtp arguments &quot;-oi -f <span>$msmtp_sender -t&quot; for sending in joinpath(mail_dir, &quot;$</span>mail_file.msmtp&quot;).</p><p>For user <code>kw...</code> see <a href="#Notmuch.userENV"><code>userENV</code></a>.</p><p>todo: <code>msmtp_sender</code> should be parsed from <code>rfc</code> content!</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/gkappler/Notmuch.jl/blob/ce82b45610e1ea263d5cf7ef5e738690552dad4f/src/msmtp.jl#L26-L35">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Notmuch.offlineimap!" href="#Notmuch.offlineimap!"><code>Notmuch.offlineimap!</code></a> — <span class="docstring-category">Function</span></header><section><div><pre><code class="language-julia hljs">offlineimap!(; cfg = &quot;.offlineimaprc&quot;, kw...)</code></pre><p>Run system Cmd <code>offlineimap</code> and then <a href="@ref"><code>notmuch_new</code></a>. Returns output of both.</p><p>For user <code>kw...</code> see <a href="#Notmuch.userENV"><code>userENV</code></a>.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/gkappler/Notmuch.jl/blob/ce82b45610e1ea263d5cf7ef5e738690552dad4f/src/user.jl#L33-L40">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Notmuch.checkpath!" href="#Notmuch.checkpath!"><code>Notmuch.checkpath!</code></a> — <span class="docstring-category">Function</span></header><section><div><pre><code class="language-julia hljs">checkpath!(x)</code></pre><p><code>!isdir(x) &amp;&amp; mkpath(x)</code></p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/gkappler/Notmuch.jl/blob/ce82b45610e1ea263d5cf7ef5e738690552dad4f/src/user.jl#L2-L6">source</a></section></article><h2 id="Helpers"><a class="docs-heading-anchor" href="#Helpers">Helpers</a><a id="Helpers-1"></a><a class="docs-heading-anchor-permalink" href="#Helpers" title="Permalink"></a></h2><h3 id="Julia-email-types"><a class="docs-heading-anchor" href="#Julia-email-types">Julia email types</a><a id="Julia-email-types-1"></a><a class="docs-heading-anchor-permalink" href="#Julia-email-types" title="Permalink"></a></h3><article class="docstring"><header><a class="docstring-binding" id="Notmuch.Emails" href="#Notmuch.Emails"><code>Notmuch.Emails</code></a> — <span class="docstring-category">Function</span></header><section><div><pre><code class="language-julia hljs">Emails(x)</code></pre><p>Transformation function to pass to <a href="#Notmuch.notmuch_show"><code>notmuch_show</code></a>.</p><pre><code class="language-julia-repl hljs">julia&gt; notmuch_tree(Emails, &quot;tag:elmail&quot;)</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/gkappler/Notmuch.jl/blob/ce82b45610e1ea263d5cf7ef5e738690552dad4f/src/Show.jl#L198-L206">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Notmuch.Email" href="#Notmuch.Email"><code>Notmuch.Email</code></a> — <span class="docstring-category">Type</span></header><section><div><pre><code class="language-julia hljs">Email</code></pre><p>struct wrapping notmuch json email format.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/gkappler/Notmuch.jl/blob/ce82b45610e1ea263d5cf7ef5e738690552dad4f/src/Show.jl#L66-L70">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Notmuch.Headers" href="#Notmuch.Headers"><code>Notmuch.Headers</code></a> — <span class="docstring-category">Type</span></header><section><div><pre><code class="language-julia hljs">Headers</code></pre><p>struct wrapping notmuch json header format.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/gkappler/Notmuch.jl/blob/ce82b45610e1ea263d5cf7ef5e738690552dad4f/src/Show.jl#L3-L7">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Notmuch.PlainContent" href="#Notmuch.PlainContent"><code>Notmuch.PlainContent</code></a> — <span class="docstring-category">Type</span></header><section><div><pre><code class="language-julia hljs">PlainContent{type}</code></pre><p>struct wrapping notmuch json content format.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/gkappler/Notmuch.jl/blob/ce82b45610e1ea263d5cf7ef5e738690552dad4f/src/Show.jl#L29-L33">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Notmuch.WithReplies" href="#Notmuch.WithReplies"><code>Notmuch.WithReplies</code></a> — <span class="docstring-category">Type</span></header><section><div><pre><code class="language-julia hljs">WithReplies{M,R}</code></pre><p>type to hold a nested reply tree. <a href="#Notmuch.notmuch_tree"><code>notmuch_tree</code></a></p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/gkappler/Notmuch.jl/blob/ce82b45610e1ea263d5cf7ef5e738690552dad4f/src/Show.jl#L115-L120">source</a></section></article><h3 id="Genie-helper-functions"><a class="docs-heading-anchor" href="#Genie-helper-functions">Genie helper functions</a><a id="Genie-helper-functions-1"></a><a class="docs-heading-anchor-permalink" href="#Genie-helper-functions" title="Permalink"></a></h3><article class="docstring"><header><a class="docstring-binding" id="Notmuch.Key" href="#Notmuch.Key"><code>Notmuch.Key</code></a> — <span class="docstring-category">Type</span></header><section><div><pre><code class="language-julia hljs">Key = Union{AbstractString,Symbol}</code></pre><p>Genie GET and POST key type.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/gkappler/Notmuch.jl/blob/ce82b45610e1ea263d5cf7ef5e738690552dad4f/src/Notmuch.jl#L19-L23">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Notmuch.omitq" href="#Notmuch.omitq"><code>Notmuch.omitq</code></a> — <span class="docstring-category">Function</span></header><section><div><pre><code class="language-julia hljs">omitq(x)
+omitqtags(x)</code></pre><p><code>q</code> is the query parameter for the search argument in notmuch.</p><p>Where it applies (<code>notmuch tag</code>) <code>tags</code> is the tag flag query <code>+add</code> and <code>-remove</code>.</p><p>Other query parameters are passed as is to <code>notmuch</code> as <code>--setting=value</code>.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/gkappler/Notmuch.jl/blob/ce82b45610e1ea263d5cf7ef5e738690552dad4f/src/genie.jl#L34-L43">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Notmuch.optionstring" href="#Notmuch.optionstring"><code>Notmuch.optionstring</code></a> — <span class="docstring-category">Function</span></header><section><div><pre><code class="language-julia hljs">optionstring(...)</code></pre><p>Internally constructs notmuch Cmd arguments from API queries. Works but should be simplified.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/gkappler/Notmuch.jl/blob/ce82b45610e1ea263d5cf7ef5e738690552dad4f/src/genie.jl#L19-L24">source</a></section></article></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.22 on <span class="colophon-date" title="Friday 5 August 2022 10:30">Friday 5 August 2022</span>. Using Julia version 1.7.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
