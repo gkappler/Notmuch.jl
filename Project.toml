@@ -20,6 +20,7 @@ SearchLight = "340e8cb6-72eb-11e8-37ce-c97ebeb32050"
 TextParse = "e0df1984-e451-5cb5-8b61-797a481e67e3"
 
 [compat]
+MbedTLS = "1"
 julia = "1"
 
 [extras]
