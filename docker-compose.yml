@@ -1,0 +1,15 @@
+version: "3.8"
+
+services:
+  notmuch: 
+    image: 45.157.178.146:5000/notmuch #:1.2.0
+    container_name: notmuch
+    build: .
+    ports:
+      - "9999:9999"  # Expose API port
+    env_file:
+      - ./.env
+    volumes: # Persist data in seperate volume
+      - ./passwd:/etc/passwd
+      - ./home:/home
+          
