@@ -2,36 +2,114 @@
 EditURL = "<unknown>/README.jl"
 ```
 
-# `Notmuch.jl`
-[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://gkappler.github.io/Notmuch.jl/dev/)
+# Notmuch.jl
 
-is a julia wrapper for [notmuch mail](https://notmuchmail.org/) indexer that supports arbitrary tags and advanced search.
+is a julia wrapper for [notmuch mail](https://notmuchmail.org/) indexer (that supports arbitrary tags and advanced search).
+Notmuch mail indexes emails into a xapian database.
+Emails need to be stored in maildir standard.
+- maildir can be smoothly synchronized with an IMAP server by [offlineimap](http://www.offlineimap.org/).
+- maildir is an archiving standard for email datasets. `Notmuch.jl` opens such email data up for analyses in Julia.
 
-Notmuch mail indexes emails into a xapian database from a maildir store.
-
-maildir 
-- is an standard for email datasets.
-- can be smoothly synchronized with an IMAP server by [offlineimap](http://www.offlineimap.org/).
-
-`Notmuch.jl` opens maildir email data up for analyses in Julia.
-
-## Prerequisites
-
-## Support of Multiple Maildirs
 On linux with a `notmuch` setup your user mails are searched by default.
-`Notmuch.jl` functions support keyword argument `user` to switch the `maildir` (and database) to
+Keyword argument `user` switches the `maildir` (and database) to
 `joinpath(ENV["NOTMUCHJL"],"home")`.
 
-Please note, that this package is a prerelease to incorporate community feedback, and these names might change.
+(Please note, that this package is a prerelease, and such names might still change.)
 
+## Prerequistes
+The package wraps external `Cmd` calls to
+1.  notmuch,
+2. offlineimap, and
+3. msmtp(?)
 
-If you do not have notmuch installed, you can use `docker-compose` to run a dockerized version (inconvenient for a REPL, but convenient for using the HTTP Api).
+On most *x OS you can install as packages, e.g.
+```
+sudo apt install notmuch offlineimap msmtp
+```
 
+I would love to merge a pull request adding these libraries as julia artifacts.
+### Windows?
+I have no idea whether Windows users can use the package installation route. (If you succeed, let us know how!)
+But you can use `docker-compose` to run a dockerized version (inconvenient for a REPL, but convenient for using the HTTP Api).
 
-## Counts
+# Email search functions
+
+## Inserting a mail or draft
 
 ````julia
 using Notmuch
+notmuch_insert(
+    rfc_mail(from="me@crazy.2022",
+             to=[ "brothers@crazy.2022", "sisters@crazy.2022" ],
+             cc=[ "holy_cow@confusing.hell",
+                  "holy_spirit@discerning.heaven" ],
+             bcc=[ "me@crazy.2022" ],
+             subject="Please sponsor open source development!",
+             tags=[ "draft", "appeal" ],
+             body="""
+                  Dear Brothers and Sisters,
+
+                  Do we need decentrally developed open source computer software, that your neighbor can help you (tinker) with?
+                  Please sponsor open source tools, that we need in the time to come!
+
+                  Do you want email search with an unbreakable message archive on your own computer?
+                  With no lock in but plain text message files in maildir standard?
+                  Then you can sponsor my development of Notmuch.jl and eλmail!
+
+                  Please sponsor any open source project you would love to manifest!
+
+                  Thank you so much! Love, peace and self mastery to us!
+
+                  Gregor
+                  """),
+    folder="drafts")
+````
+
+`insert` currently does not return any message id.
+One (concurrency unsafe) way to show the inserted message might be:
+## Show mail
+
+````julia
+notmuch_show(notmuch_search("*", limit=1)[1]["thread"])
+````
+
+````
+1-element JSON3.Array{JSON3.Array, Base.CodeUnits{UInt8, String}, Vector{UInt64}}:
+ JSON3.Array[Any[{
+              "id": "notmuch-sha1-18111b839e85f8ec250ec265e045610e347204d2",
+           "match": true,
+        "excluded": false,
+        "filename": [
+                      "/home/gregor/.notmuch/drafts/cur/1664281656.M129430P15462.x360:2,S"
+                    ],
+       "timestamp": 1664281656,
+   "date_relative": "0 mins. ago",
+            "tags": [
+                      "inbox",
+                      "new"
+                    ],
+            "body": [
+                      {
+                                   "id": 1,
+                         "content-type": "text/plain",
+                              "content": "Dear Brothers and Sisters,\n\nDo we need decentrally developed open source computer software, that your neighbor can help you (tinker) with?\nPlease sponsor open source tools, that we need in the time to come!\n\nDo you want email search with an unbreakable message archive on your own computer?\nWith no lock in but plain text message files in maildir standard?\nThen you can sponsor my development of Notmuch.jl and eλmail!\n\nPlease sponsor any open source project you would love to manifest!\n\nThank you so much! Love, peace and self mastery to us!\n\nGregor\n\n\n\n"
+                      }
+                    ],
+          "crypto": {},
+         "headers": {
+                       "Subject": "Please sponsor open source development!   #appeal",
+                          "From": "me@crazy.2022",
+                            "To": "brothers@crazy.2022, sisters@crazy.2022",
+                            "Cc": "holy_cow@confusing.hell, holy_spirit@discerning.heaven",
+                           "Bcc": "me@crazy.2022",
+                          "Date": "Tue, 27 Sep 2022 14:27:36 +0200"
+                    }
+}, Union{}[]]]
+````
+
+## Mail Counts
+
+````julia
 notmuch_count("notmuch.jl julia")
 ````
 
@@ -39,7 +117,7 @@ notmuch_count("notmuch.jl julia")
 1
 ````
 
-## Search
+## Mail Search
 
 ````julia
 notmuch_search("notmuch.jl julia")
@@ -61,6 +139,7 @@ notmuch_search("notmuch.jl julia")
                     ],
             "tags": [
                       "delete",
+                      "doc",
                       "draft",
                       "draftversion",
                       "elmail",
@@ -84,7 +163,7 @@ notmuch_search(Thread, "notmuch.jl julia")
 ````
 1-element Vector{Thread}:
  June 01 Installation of elmail
-         mail@g-kappler.de #delete #draft #draftversion #elmail #flagged #important #inbox #notmuch #todo #unread
+         mail@g-kappler.de #delete #doc #draft #draftversion #elmail #flagged #important #inbox #notmuch #todo #unread
 ````
 
 ## Trees
@@ -94,23 +173,21 @@ notmuch_tree(Emails,"notmuch.jl julia")
 ````
 
 ````
-1-element Vector{Vector{Notmuch.WithReplies{Nothing, Vector{Union{Nothing, Notmuch.WithReplies{Nothing}}}}}}:
- [
-├─ 
-│  └─ mail@g-kappler.de #draft #elmail #flagged #important #inbox #notmuch #todo #unread
-│     Installation of elmail       June 01
-│     
-│     └─ 
-├─ 
+
 └─ 
    └─ 
       ├─ 
+      │  └─ June 01 mail@g-kappler.de #doc #draft #elmail #flagged #important #inbox #notmuch #todo #unread
+      │     Installation of elmail
+      │     └─ 
+      ├─ 
       └─ 
          └─ 
+            ├─ 
             └─ 
                ⋮
                
-]
+
 ````
 
 Julia types are also provided for `Email`, `Header`, `Mailbox` adresses
@@ -123,46 +200,32 @@ notmuch_tree(Emails,"notmuch.jl julia", entire_thread=true)
 ````
 
 ````
-1-element Vector{Vector{Notmuch.WithReplies{Email, Vector{Any}}}}:
- [mail@g-kappler.de #draft #notmuch #todo #unread
-Notmuch Elmail -- Agenda       March 13
 
-├─ mail@g-kappler.de #draft #draftversion #flagged #inbox #notmuch #unread
-│  Installation of elmail       March 14
-│  
-│  └─ mail@g-kappler.de #draft #elmail #flagged #important #inbox #notmuch #todo #unread
-│     Installation of elmail       June 01
-│     
-│     └─ mail@g-kappler.de #draft #inbox #todo #unread
-│        Encrypting user passwords       June 01
-│        
-├─ mail@g-kappler.de #draft #flagged #inbox #notmuch #todo #unread
-│  Attachments       March 14
-│  
-└─ mail@g-kappler.de #draft #draftversion #inbox #unread
-   test1       June 01
-   
-   └─ mail@g-kappler.de #draft #draftversion #inbox #unread
-      test1       June 01
-      
-      ├─ mail@g-kappler.de #delete #draft #inbox #unread
-      │  test1       June 01
-      │  
-      └─ mail@g-kappler.de #draft #draftversion #inbox #unread
-         test1       June 01
-         
-         └─ mail@g-kappler.de #draft #draftversion #inbox #unread
-            test1       June 01
-            
-            └─ mail@g-kappler.de #draft #draftversion #inbox #unread
-               test1       June 01
-               
+└─ 
+   └─ 2022-03-13 mail@g-kappler.de #draft #notmuch #todo #unread
+      Notmuch Elmail -- Agenda
+      ├─ 2022-03-14 mail@g-kappler.de #draft #draftversion #flagged #inbox #notmuch #unread
+      │  Installation of elmail
+      │  └─ June 01 mail@g-kappler.de #doc #draft #elmail #flagged #important #inbox #notmuch #todo #unread
+      │     Installation of elmail
+      │     └─ June 01 mail@g-kappler.de #draft #inbox #todo #unread
+      │        Encrypting user passwords
+      ├─ 2022-03-14 mail@g-kappler.de #draft #flagged #inbox #notmuch #todo #unread
+      │  Attachments
+      └─ June 01 mail@g-kappler.de #draft #draftversion #inbox #unread
+         test1
+         └─ June 01 mail@g-kappler.de #draft #draftversion #inbox #unread
+            test1
+            ├─ June 01 mail@g-kappler.de #delete #draft #inbox #unread
+            │  test1
+            └─ June 01 mail@g-kappler.de #draft #draftversion #inbox #unread
+               test1
                ⋮
                
-]
+
 ````
 
-## Tagging
+## Tagging of mails (matching a search)
 you can also tag messages
 
 ````julia
@@ -175,25 +238,11 @@ notmuch_search(Thread, "notmuch.jl julia")
 ````
 1-element Vector{Thread}:
  June 01 Installation of elmail
-         mail@g-kappler.de #delete #draft #draftversion #elmail #flagged #important #inbox #notmuch #todo #unread
+         mail@g-kappler.de #delete #doc #draft #draftversion #elmail #flagged #important #inbox #notmuch #todo #unread
 ````
-
-## Inserting
 
 ## JSON3
 Without a type argument, notmuch commands are by returning `notmuch` output format by default parsed as JSON3.
-
-# Limitations
-Again, the package is currently a prerelease, and structure with `WithReplies` might change.
-
-```julia
-using Notmuch
-
-@sentafter Date(2022,1,1)
-@threads "notmuch.jl julia"
-@headers "notmuch.jl julia"
-@emails "notmuch.jl julia"
-```
 
 ## HTTP API
 Genie.jl
@@ -204,6 +253,19 @@ User directories can be queried but authentication of users is not yet implement
 ### elmail.elm
 The API also exposes an experimental email client at [http://localhost/elmail?tag:unread](http://localhost/elmail?tag:unread):
 The code for this functional eλmail messenger has not yet been released!
+
+# Limitations
+Again, the package is currently a prerelease, and structure with `WithReplies` might change.
+
+# Macros would be nice:
+```julia
+using Notmuch
+
+@sentafter Date(2022,1,1)
+@threads "notmuch.jl julia"
+@headers "notmuch.jl julia"
+@emails "notmuch.jl julia"
+```
 
 ---
 

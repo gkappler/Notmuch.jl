@@ -136,10 +136,6 @@ keepit(x::AbstractVector) = !isempty(x)
 simplify(x) = WithReplies(x)
 
     
-using CombinedParsers
-alpha = CharIn('a':'z','A':'Z')
-alphanum = CharIn('a':'z','A':'Z','0':'9')
-extrachar = CharIn("-+_.~")
 struct Mailbox
     user::String
     domain::String
@@ -149,10 +145,16 @@ function Base.show(io::IO, x::Mailbox)
     printstyled(io, "@", x.domain; color = :light_yellow)
 end
 ## is this official??
-email_regexp = Sequence(!(CharIn(extrachar,alpha)*Repeat(CharIn(extrachar,alphanum))),
-                        "@",!Repeat1(CharIn(CharIn("-."),alphanum))) do v
-                            Mailbox(v[1], v[3])
-                        end
+
+using CombinedParsers
+alpha = CharIn('a':'z','A':'Z')
+alphanum = CharIn('a':'z','A':'Z','0':'9')
+extrachar = CharIn("-+_.~")
+email_regexp = Sequence(
+    !(CharIn(extrachar,alpha)*Repeat(CharIn(extrachar,alphanum))),
+    "@",!Repeat1(CharIn(CharIn("-."),alphanum))) do v
+        Mailbox(v[1], v[3])
+    end
 
 author_email = Either(
     Sequence(

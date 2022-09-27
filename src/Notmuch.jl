@@ -819,8 +819,8 @@ notmuch_tag(batch::Pair{<:AbstractString,<:AbstractString}...; kw...) =
 
 
 using SMTPClient
-
-function mailfile(; from, to=String[], cc=String[], bcc=String[], subject, body, replyto="", messageid="", in_reply_to="", references="", date = now(), attachments = String[], tags = String[], message_id = "", inreplyto ="", kw... )
+export rfc_mail
+function rfc_mail(; from, to=String[], cc=String[], bcc=String[], subject, body, replyto="", message_id = "", in_reply_to="", references="", date = now(), attachments = String[], tags = String[], kw... )
     ts = [ "#$tag" for tag in tags
               if !(tag in ["inbox", "unread", "new", "flagged","draft","draftversion","attachment"])]
     io = SMTPClient.get_body(
@@ -829,17 +829,15 @@ function mailfile(; from, to=String[], cc=String[], bcc=String[], subject, body,
         body; cc=cc,
         bcc=bcc,
         replyto=replyto,
-        messageid=messageid,
-        inreplyto=inreplyto,
+        messageid=message_id,
+        inreplyto=in_reply_to,
         references=references,
         date=date,
-        ## attachments file upload mechanism?
-        # save in attachments/:mailfilename/uploadfilen.ame
         attachments=attachments
     )
     s = String(take!(io))
 end
-export mailfile
+export rfc_mail
 
 """
     notmuch_insert(mail; folder="juliatest")
@@ -865,5 +863,56 @@ export notmuch_insert
 include("Show.jl")
 
 include("msmtp.jl")
+
+function notmuch_config(; kw... )
+    env = userENV(; kw...)
+    cfg_file = joinpath(env["HOME"], ".notmuch-config")
+    parse_notmuch_cfg()(read(cfg_file, String))
+end
+
+export parse_notmuch_config
+function parse_notmuch_cfg()
+    line = !Atomic(Sequence(1, !re"[^\n]+", "\n"))
+    section = Sequence(2,"[", !re"[^]]+", "]", whitespace)
+    comment = Sequence(2,re"#+ *", !re"[^\n]*", "\n")
+    function splitter(key)
+        Sequence(
+            key, re" *= *",
+            join(!re"[^;\n]+",";"), "\n") do v
+                (key = Symbol(key), value = v[3])
+            end
+    end
+    setting =
+        Either(
+            splitter("tags"),
+            splitter("exclude_tags"),
+            splitter("other_email"),
+            Sequence(:key => !word, re" *= *", :value => line)
+        )
+    whitespace_newline = !re" *\n"
+    #
+    Repeat(Either(
+        Sequence(
+            section,
+            Repeat(setting)) do v
+                sect,set = v
+                Symbol(sect) => Dict(
+                    [ (Symbol(k.key) => k.value)
+                      for k in set
+                          if k !== nothing ]...
+                              )
+            end,
+        Repeat1(
+            Either(
+                comment,
+                whitespace_newline)) do v
+                    nothing
+                end
+    )) do v
+        Dict(filter(x -> x!==nothing, v)...)
+    end
+end
+
+
 
 end
