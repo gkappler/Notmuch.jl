@@ -49,6 +49,12 @@ function msmtp(rfc; msmtp_sender = env_msmtp_sender(),
     end
 end
 
+function msmtp_config(;kw... )
+    env = userENV(; kw...)
+    cfg_file = joinpath(env["HOME"], ".msmtprc")
+    Repeat(parse_msmtp_cfg())(read(cfg_file, String))
+end
+
 # function msmtp_daemon(sleep_seconds=5)
 #     mdir = expanduser("~/.msmtpqueue/")
 #     if !isdir(mdir)
@@ -98,22 +104,67 @@ function msmtp_config_string(; account, host, from, user, password, log = "$from
     """
 end
 
-function msmtp_config!()
-    let config = expanduser("~/.msmtprc")
-        if !isfile(config)
-            open(config, "w") do io
-                print(io, """
-    account noreplyhandelsregister
-    host $(env_msmtp_host())
-    from $(env_msmtp_sender())
-    tls on
-    tls_certcheck off
-    auth on
-    user $(env_msmtp_user())
-    password $(env_msmtp_password())
-    logfile $(env_msmtp_log())
-    """)
-            end
-        end    
+struct SMTPConfig
+    account::String
+    host::String
+    from::String
+    domain::String # ?
+    port::String
+    tls::String
+    tls_starttls::String
+    tls_certcheck::String
+    tls_trust_file::String
+    auth::String 
+    user::String
+    password::String
+    logfile::String
+
+    function SMTPConfig(account; x...)
+        d = Dict(:account => account, x...)
+        new(( get(d,k,"")
+              for k in fieldnames(SMTPConfig) )...)
     end
 end
+
+function Base.show(io::IO, x::SMTPConfig)
+    for f in propertynames(x)
+        println(io, f, " ", getproperty(x,f))
+    end
+end
+
+using CombinedParsers.Regexp
+word = !re"[^\v\h]+"
+whitespace = re"[\v\h]+"
+
+msmtp_setting(x) =
+    Sequence(3, x, whitespace, word, whitespace) do v
+        Symbol(x) => v
+    end
+
+export parse_msmtp_cfg
+
+parse_msmtp_cfg() =
+    Sequence(
+        msmtp_setting("account"),
+        Repeat(
+            Either(
+                msmtp_setting.([
+                    "host",
+                    "from",
+                    "domain", # ?
+                    "port",
+                    "tls",
+                    "tls_starttls",
+                    "tls_certcheck",
+                    "tls_trust_file",
+                    "auth", 
+                    "user",
+                    "password",
+                    "logfile",
+                    "#"
+                ]
+                               )))
+    ) do v
+        SMTPConfig(v[1].second; v[2]...)
+    end
+
