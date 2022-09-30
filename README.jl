@@ -22,7 +22,12 @@
 # ```
 # sudo apt install notmuch offlineimap msmtp
 # ```
-# 
+#
+# Install my SMTPClient fork:
+# ```julia
+# ] add https://github.com/gkappler/SMTPClient.jl
+# ```
+#
 # I would love to merge a pull request adding these libraries as julia artifacts.
 # ### Windows?
 # I have no idea whether Windows users can use the package installation route. (If you succeed, let us know how!)
