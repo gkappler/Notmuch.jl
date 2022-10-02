@@ -14,7 +14,7 @@ module Notmuch
 
 using JSON3
 
-using Genie, Logging, LoggingExtras
+using Logging, LoggingExtras
 
 """
     Key = Union{AbstractString,Symbol} 
