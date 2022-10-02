@@ -16,6 +16,11 @@ include("config/env/dev.jl")
 #     json(readdir(joinpath(ENV["NOTMUCHJL"],"home")))
 # end
 
+route("/json/" * "from") do 
+    payload = getpayload()
+    json([ c.from for c in msmtp_config(; payload...) ])
+end
+
 route("/json/" * "count") do 
     payload = getpayload()
     json(parse(Int,chomp(Notmuch.notmuch(
@@ -216,48 +221,39 @@ route("/json/" * "reply", method="POST") do
         user = get(payload,"user",nothing)))
 end
 
-    
-route("/api/" * "save", method="POST") do
-    payload = jsonpayload()
-    m = mailfile(;(Symbol(k) => v for (k,v) in payload
-                       if k != "tags")...);
-        ## todo: parse from file!
-    @info "saving" m
-    println(m)
-    #paths = Notmuch.userENV(; )
-    #cd(@show paths.home)
-    notmuch_insert(m
-                   ; tags = payload["tags"]
-                   , folder="elmail"
-                   , user=payload["user"])
-    # open(
-    #     Notmuch.notmuch_cmd(
-    #         "insert", "--create-folder" ,"--folder=elmail",
-    #         "-new",
-    #         ["+"*p for p in payload["tags"]]...;
-    #         user=payload["user"]
-    #             ),
-    #     "w", stdout) do io
-    #         println(io,mailfile(payload))
-    #         # close(io)
-    #     end
-    #Notmuch.noENV!()
-    "ok"
-end
 
 using Dates
 
 route("/api/send", method="POST") do
     payload = jsonpayload()
-    env = Notmuch.userENV(; user=payload["user"])
+    rfc = rfc_mail(;(Symbol(k) => v for (k,v) in payload)...)
+    @info "sending" payload["from"] payload["subject"]
+    println(rfc)
     Notmuch.msmtp(
-    mailfile(;(Symbol(k) => v for (k,v) in payload)...);
+        rfc;
         ## todo: parse from file!
         msmtp_sender = Notmuch.author_email(payload["from"]).email,
-        mail_dir = env["HOME"]*"/.msmtpqueue",
-        mail_file = Dates.format(now(),"yyyy-mm-dd-HH.MM.SS")
+        mailfile = Dates.format(now(),"yyyy-mm-dd-HH.MM.SS")
+        , user=payload["user"]
     )
     Notmuch.msmtp_runqueue!(;user=payload["user"])
+end
+    
+route("/api/" * "save", method="POST") do
+    ## attachments file upload mechanism?
+    # save in attachments/:rfc_mailname/uploadfilen.ame
+    payload = jsonpayload()
+    rfc = rfc_mail(
+        ;(Symbol(k) => v for (k,v) in payload
+              if k != "tags")...);
+    @info "saving" payload["from"] payload["subject"]
+    println(rfc)
+    notmuch_insert(rfc
+                   ; tags = payload["tags"]
+                   , folder="elmail"
+                   , user=payload["user"]
+                   )
+    "ok"
 end
 
 route("/admin/quickpoll", method="POST") do
@@ -284,15 +280,15 @@ end
 
 Genie.up()
 
-function pass_insert(pass, path)
-    spath = join(path,"/")
-    open(
-        (`pass insert $spath`),
-        "w", stdout) do io
-            println(io,pass)
-            println(io,pass)
-        end
-end
+# function pass_insert(pass, path)
+#     spath = join(path,"/")
+#     open(
+#         (`pass insert $spath`),
+#         "w", stdout) do io
+#             println(io,pass)
+#             println(io,pass)
+#         end
+# end
 
 # route("/api/" * "send", method="POST") do
 #     @show p = jsonpayload()
