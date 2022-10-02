@@ -20,7 +20,7 @@ Notmuch.TagChange
 Notmuch.notmuch_tag
 ```
 
-## Multiple users
+## Multiple user directories
 ```@docs
 Notmuch.userENV
 ```
