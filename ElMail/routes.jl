@@ -278,7 +278,7 @@ route("/api/" * "delete", method="POST") do
     "ok"
 end
 
-Genie.up()
+# Genie.up()
 
 # function pass_insert(pass, path)
 #     spath = join(path,"/")
