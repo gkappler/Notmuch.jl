@@ -10,6 +10,5 @@ services:
     env_file:
       - ./.env
     volumes: # Persist data in seperate volume
-      - ./passwd:/etc/passwd
       - ./home:/home
           
