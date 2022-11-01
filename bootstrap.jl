@@ -6,5 +6,5 @@ Pkg.activate(".")
 
 using SMTPClient
 using Notmuch
-push!(Base.modules_warned_for, Base.PkgId(Notmuch))
+# push!(Base.modules_warned_for, Base.PkgId(Notmuch))
 Notmuch.main()
