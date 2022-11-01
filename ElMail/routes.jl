@@ -335,13 +335,13 @@ notmuch_commands_json = [
     "count" => "Count messages matching the search terms.",
 ]
 
-# route("/") do
-#     String(read(open("elm/static/index.html","r")))
-# end
+route("/") do
+    String(read(open("elm/static/index.html","r")))
+end
 
-# route("main.js") do
-#     String(read(open("elm/main.js","r")))
-# end
+route("main.js") do
+    String(read(open("elm/main.js","r")))
+end
 
 #   Find and import new messages to the notmuch database.
 route("/api/fetch") do
