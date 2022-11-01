@@ -3,7 +3,7 @@ FROM julia:1.7
 # copy application WAR (with libraries inside)
 run mkdir /usr/local/webhooks
 COPY . /root/Notmuch
-RUN julia --project=/root/Notmuch/ElMail -e 'using Pkg; println(pwd()); Pkg.add(url="https://github.com/gkappler/SMTPClient.jl");Pkg.add(path=".");Pkg.instantiate();'
+RUN julia -e 'using Pkg; println(pwd()); Pkg.activate("/root/Notmuch"); Pkg.status(); Pkg.add(url="https://github.com/gkappler/SMTPClient.jl"); Pkg.instantiate(); Pkg.activate("/root/Notmuch/ElMail"); Pkg.add(path="/root/Notmuch");Pkg.instantiate();'
 
 COPY msmtp-runqueue.sh /usr/share/doc/msmtp/examples/msmtpqueue/
 RUN chmod +x /usr/share/doc/msmtp/examples/msmtpqueue/msmtp-runqueue.sh
