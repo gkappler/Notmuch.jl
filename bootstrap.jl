@@ -4,6 +4,7 @@
 using Pkg
 Pkg.activate(".")
 
+cd(ENV["ELMAILDIR"])
 using SMTPClient
 using Notmuch
 # push!(Base.modules_warned_for, Base.PkgId(Notmuch))
