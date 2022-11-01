@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Notmuch-elmail</title>
+    <!-- <script src="https://js.stripe.com/v3/"></script> -->
+    <script src="main.js"></script>
+    <style>
+      ::-webkit-scrollbar {
+	  width: 12px;
+      }
+
+      ::-webkit-scrollbar-track {
+	  -webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.3); 
+	  border-radius: 10px;
+      }
+
+      ::-webkit-scrollbar-thumb {
+	  border-radius: 10px;
+	  -webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.5); 
+      }
+      ::-webkit-scrollbar {
+	  width: 12px;
+      }
+
+      ::-webkit-scrollbar-track {
+	  -webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.3); 
+	  border-radius: 10px;
+      }
+
+      ::-webkit-scrollbar-thumb {
+	  border-radius: 10px;
+	  -webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.5); 
+      }
+      <!-- firefox-->
+    </style>
+  </head>
+
+  <body>
+    <div id="myapp"></div>
+    <script>
+      const stripeKey = "pk_test_51JY94KLrS5ydr9zICgsMoD8e1lnY8wBmWfwDlrQSMlIE9X3Q641sl0ERHJMgr668K9BkAEF5JjFgCeW2DJll7LD800lAPmNzGN";
+      var app = Elm.Main.init({
+          node: document.getElementById('myapp'),
+          stripekey: stripeKey
+      });
+    </script>
+  </body>
+</html>
