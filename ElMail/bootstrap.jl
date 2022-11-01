@@ -2,9 +2,7 @@
 
 using Pkg
 Pkg.activate(".");
-Pkg.add(path="..");
-Pkg.add(url="https://github.com/gkappler/SMTPClient.jl");
-Pkg.instantiate();
+#Pkg.add(path="..");Pkg.add(url="https://github.com/gkappler/SMTPClient.jl");Pkg.instantiate();
 
 using ElMail
 const UserApp = ElMail
