@@ -336,11 +336,11 @@ notmuch_commands_json = [
 ]
 
 route("/") do
-    String(read(open("elm/static/index.html","r")))
+    String(read(open("public/elmail.html","r")))
 end
 
 route("main.js") do
-    String(read(open("elm/main.js","r")))
+    String(read(open("public/main.js","r")))
 end
 
 #   Find and import new messages to the notmuch database.
