@@ -7,7 +7,7 @@
    viewBox="0 0 42.711998 42.711998"
    version="1.1"
    id="svg5"
-   inkscape:version="1.2 (56b05e47e7, 2022-06-09, custom)"
+   inkscape:version="1.2.2 (b0a8486541, 2022-12-01, custom)"
    sodipodi:docname="search.svg"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
@@ -25,7 +25,7 @@
      inkscape:document-units="mm"
      showgrid="false"
      inkscape:zoom="2.4906536"
-     inkscape:cx="49.986879"
+     inkscape:cx="82.106962"
      inkscape:cy="74.879943"
      inkscape:window-width="924"
      inkscape:window-height="1009"
@@ -45,14 +45,14 @@
        cx="-56.964737"
        cy="55.254314"
        r="19.807758"
-       style="fill:#ffffff;stroke:#13080a;stroke-width:2;stroke-dasharray:none;stroke-opacity:0.14117648"
+       style="fill:#ffffff;stroke:#a8ee37;stroke-width:2;stroke-dasharray:none;stroke-opacity:1;fill-opacity:0"
        transform="rotate(-90)" />
     <circle
        id="path61-3-6"
        cx="-56.964737"
        cy="55.254314"
        r="12.793715"
-       style="fill:#75550a;stroke:#13080a;stroke-width:2;stroke-dasharray:none;stroke-opacity:0.14117648"
+       style="fill:#a8ee37;stroke:none;stroke-width:2;stroke-dasharray:none;stroke-opacity:0.14117648;fill-opacity:1"
        transform="rotate(-90)" />
   </g>
 </svg>

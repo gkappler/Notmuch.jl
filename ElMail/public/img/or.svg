@@ -7,7 +7,7 @@
    viewBox="0 0 27.587429 42.712338"
    version="1.1"
    id="svg5"
-   inkscape:version="1.2 (56b05e47e7, 2022-06-09, custom)"
+   inkscape:version="1.2.2 (b0a8486541, 2022-12-01, custom)"
    sodipodi:docname="or.svg"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
@@ -25,13 +25,13 @@
      inkscape:document-units="mm"
      showgrid="false"
      inkscape:zoom="2.4906536"
-     inkscape:cx="28.305823"
-     inkscape:cy="112.62104"
-     inkscape:window-width="924"
+     inkscape:cx="28.506574"
+     inkscape:cy="113.42404"
+     inkscape:window-width="1848"
      inkscape:window-height="1009"
      inkscape:window-x="72"
      inkscape:window-y="34"
-     inkscape:window-maximized="0"
+     inkscape:window-maximized="1"
      inkscape:current-layer="layer1" />
   <defs
      id="defs2" />
@@ -45,32 +45,43 @@
        cx="-48.859615"
        cy="54.711647"
        r="12.793715"
-       style="fill:#75550a;stroke:#13080a;stroke-width:2;stroke-dasharray:none;stroke-opacity:0.14117648"
+       style="fill:#a8ee37;stroke:#a8ee37;stroke-width:2;stroke-dasharray:none;stroke-opacity:1;fill-opacity:1"
        transform="rotate(-90)" />
     <circle
        id="path61"
        cx="-63.984524"
        cy="54.711647"
        r="12.793715"
-       style="fill:#75550a;stroke:#13080a;stroke-width:2;stroke-dasharray:none;stroke-opacity:0.14117648"
+       style="fill:#a8ee37;stroke:#a8ee37;stroke-width:2;stroke-dasharray:none;stroke-opacity:1;fill-opacity:1"
        transform="rotate(-90)" />
     <circle
        id="path61-3-5"
        cx="-48.859615"
        cy="54.711647"
        r="12.793715"
-       style="fill:none;stroke:#13080a;stroke-width:2;stroke-dasharray:none;stroke-opacity:0.14117648"
+       style="fill:none;stroke:#a8ee37;stroke-width:2;stroke-dasharray:none;stroke-opacity:1"
        transform="rotate(-90)" />
     <text
        xml:space="preserve"
-       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:10.5833px;line-height:1.25;font-family:'Futura Book';-inkscape-font-specification:'Futura Book, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.264583"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:10.5833px;line-height:1.25;font-family:'Futura Book';-inkscape-font-specification:'Futura Book, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#ffffff;fill-opacity:0.21815611;stroke:none;stroke-width:0.264583"
        x="48.842842"
-       y="59.130898"
+       y="69.714241"
        id="text423"><tspan
          sodipodi:role="line"
          id="tspan421"
-         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:10.5833px;font-family:'Futura Book';-inkscape-font-specification:'Futura Book, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#ffffff;stroke-width:0.264583"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:10.5833px;font-family:'Futura Book';-inkscape-font-specification:'Futura Book, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#ffffff;stroke-width:0.264583;fill-opacity:0.21815611"
          x="48.842842"
-         y="59.130898">or</tspan></text>
+         y="69.714241">or</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:18.807px;line-height:1.25;font-family:'Futura Book';-inkscape-font-specification:'Futura Book, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#ffffff;fill-opacity:0.21815611;stroke:none;stroke-width:0.470178"
+       x="47.700329"
+       y="49.748878"
+       id="text423-7"><tspan
+         sodipodi:role="line"
+         id="tspan421-5"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:18.807px;font-family:'Futura Book';-inkscape-font-specification:'Futura Book, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#ffffff;stroke-width:0.470178;fill-opacity:0.21815611"
+         x="47.700329"
+         y="49.748878">∨</tspan></text>
   </g>
 </svg>
