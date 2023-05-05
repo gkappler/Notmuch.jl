@@ -808,6 +808,17 @@ Base.isequal(x::TagChange, y::TagChange) =
 Base.show(io::IO, x::TagChange) =
     print(io, x.prefix, x.tag)
 
+using CombinedParsers
+elmail_api_tag_subject = Sequence(Either("+", "-"), !Repeat1(CharNotIn(" ")), " tag ", integer_base(10), " ", !Repeat(AnyChar())) do v
+    (query = v[6], rule = TagChange(v[1],v[2]), count = v[4])
+end;
+
+function tag_history(; kw...)
+    [ (;elmail_api_tag_subject(x.headers.Subject)..., date = x.timestamp)
+      for x in flatten(notmuch_show("tag:autotag"; body = false, kw...))
+          ]
+end
+
 """
     notmuch_tag(batch::Pair{<:AbstractString,<:AbstractString}...; kw...)
     notmuch_tag(batch::Vector{Pair{String,TagChange}}; kw...)
