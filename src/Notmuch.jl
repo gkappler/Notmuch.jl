@@ -303,6 +303,25 @@ notmuch_search(T::ToF, x...; kw...) =
     T.(notmuch_search(x...; kw...))
 export notmuch_search
 
+function counts(basq, a...; subqueries=String[], kw...)
+    if isempty(subqueries)
+        [ notmuch_count(a..., basq;kw...) ]
+    else
+        [ parse(Int,chomp(Notmuch.notmuch(
+            "count", basq !== nothing ? "($basq) and ($t)" : t;
+            kw...)))
+          for t in subqueries ]
+    end
+end
+
+function tagcounts(query, a...; kw...)
+    ts = Notmuch.notmuch_json("search", "--output=tags", a..., query; kw...)
+    [ (tag=t, count=parse(Int,chomp(
+        Notmuch.notmuch(
+            "count", "($query) and tag:$t"; kw...))))
+          for t in ts ]
+end
+
 using Dates
 function date_query(from,to)
     function unixstring(x)
