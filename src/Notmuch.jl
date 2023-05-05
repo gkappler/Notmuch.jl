@@ -545,7 +545,8 @@ export notmuch_address
     notmuch_show(query, x...; body = true, entire_thread=false, kw...)
     notmuch_show(T::Union{Type,Function}, x...; kw...)
 
-Return `notmuch show`.
+`notmuch_search` for `query` and return `notmuch show` for each resulting thread.
+(This filtering through threads returns not too long list of first results. You can use `limit` and `offset` keywords.)
 
 With first argument `f::Union{Type,Function}` each result is converted with calling `f`, otherwise JSON is returned.
 
@@ -750,8 +751,9 @@ From the man page:
        command.
 
 """
-function notmuch_show(query, x...; body = true, entire_thread=false, kw...)
-    tids = [ t.thread for t in notmuch_search(query, x...; kw...) ]
+function notmuch_show(query, x...; body = true, entire_thread=false, offset = 0, limit = LIMIT, kw...)
+    tids = [ t.thread for t in notmuch_search(query, x...; offset = offset, limit = limit, kw...) ]
+    isempty(tids) && return []
     ##@debuginfo "show" query x tids
     threadq = join("thread:" .* tids, " or ")
     notmuch_json(:show, x..., "--body=$body", "--entire-thread=$(entire_thread)",
