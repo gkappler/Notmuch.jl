@@ -797,9 +797,13 @@ struct TagChange
         new(prefix,tag)
     end
 end
+
 function TagChange(tag)
     TagChange(tag[1:1], tag[2:end])
 end
+
+Base.isequal(x::TagChange, y::TagChange) =
+    x.tag == y.tag
 
 Base.show(io::IO, x::TagChange) =
     print(io, x.prefix, x.tag)
