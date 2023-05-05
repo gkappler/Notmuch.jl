@@ -829,28 +829,71 @@ Spaces in tags are supported, but other query string encodings for [`notmuch tag
 
 For user `kw...` see [`userENV`](@ref).
 """
-function notmuch_tag(batch::Vector{Pair{String,TagChange}}; kw...)
+function notmuch_tag(batch::Dict{<:AbstractString,<:AbstractVector{TagChange}};
+                     user = nothing,
+                     from= userEmail(user), to = String["elmail_api_tag@g-kappler.de"], body = "", kw...)
+    freshtags = Any[]
+    for (qq,tagchanges) in batch
+        for tc in unique(tagchanges)
+            q = "("*qq*") and (" * (tc.prefix == "+" ? " not" * tc.tag : "" ) * " tag:" * tc.tag  * ")"
+            N = Notmuch.notmuch_count(q; kw...)
+            if N > 0
+                ids = 
+                    Notmuch.notmuch_search(
+                        q, "--limit=$N", "--output=messages";
+                        limit = N, kw...)
+                folder, tags, rfc = if startswith(qq,"id:")
+                    "elmail/tag", [ TagChange("+tag") ], 
+                    rfc_mail(from = from, to = to, 
+                             in_reply_to = "<" * qq[4:end] * ">",
+                             subject = "$tc tag", body= body)
+                else
+                    "elmail/autotag", [ TagChange("+autotag") ],
+                    rfc_mail(from = from, to = to, 
+                             subject = "$tc tag $N $qq", body = body,
+                             attachments = 
+                                 [ SMTPClient.MimeContent{MIME{Symbol("notmuch/ids")}}(
+                                     "notmuch.ids",
+                                     ## 
+                                     join([tc.prefix * replace(tc.tag, " " => "%20") * " -- id:" * id for id in ids ]
+                                          ,"\n")
+                                 )
+                                   ]
+                             )
+                end
+                @info "$tc $N: $qq"
+                push!(freshtags,(rule = qq => tc, count = N))
+                notmuch_insert(rfc
+                               ; tags = [ tags..., TagChange("-inbox"), TagChange("-new") ]
+                               , folder= folder
+                               , kw...
+                                   )
+            end
+        end
+    end
+    
     ##cd(@show paths.home)
     open(
         Notmuch.notmuch_cmd(
             "tag", "--batch"; kw...
         ),
         "w", stdout) do io
-            for (q, tc) in batch
-                @debug "tag $q" tc
+            for (q, tagchanges) in batch
                 # println(tc.prefix,
                 #         replace(tc.tag, " " => "%20")
                 #         , " -- ", q)
-                println(io, tc.prefix,
-                        replace(tc.tag, " " => "%20")
-                        , " -- ", q)
+                for tc in tagchanges
+                    println(io, tc.prefix,
+                            replace(tc.tag, " " => "%20")
+                            , " -- ", q)
+                end
             end
             # close(io)
         end
     ##noENV!()
 end
 notmuch_tag(batch::Pair{<:AbstractString,<:AbstractString}...; kw...) =
-    notmuch_tag([q => TagChange(x) for (q,x) in batch]; kw...)
+    notmuch_tag(Dict(q => [TagChange(x)] for (q,x) in batch); kw...)
 
 
 
