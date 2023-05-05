@@ -151,9 +151,9 @@ end
 include("Threads.jl")
 
 ToF = Union{Type,Function}
-
+LIMIT = 5
 """
-    notmuch_search(query, x...; offset=0, limit=5, kw...)
+    notmuch_search(query, x...; offset=0, limit=LIMIT, kw...)
     notmuch_search(T::Union{Type,Function}, x...; kw...)
 
 Search notmuch and return threads json `Vector`.
