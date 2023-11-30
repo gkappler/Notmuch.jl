@@ -9,6 +9,7 @@ struct Headers
     Subject::String
     From::String
     To::String
+    Cc::String
     Date::DateTime #  format: Sat, 28 May 2022 10:03:20 +0100
 end
 headerfield(::Val{:Date}, x::Nothing) = now()
@@ -25,6 +26,7 @@ function Headers(x)
              for k in fieldnames(Headers))...)
 end
 
+trim(x) = replace(x, r"^[ \n\t\r]+" => "", r"[ \n\t\r]+$" => "")
 
 """
     PlainContent{type}
@@ -44,8 +46,30 @@ struct Content{type}
     content_length::Union{Nothing,Int}
 end
 Base.show(io::IO, x::Content{Symbol("text/plain")}) =
-    print(io,replace(x.content, r"\n+$" => "" ))
+    print(io,trim(x.content))
 
+function Base.show(io::IO, x::Content{Symbol("multipart/alternative")}) 
+    print(io,x.content[1])
+end
+function Base.show(io::IO, x::Content{Symbol("multipart/related")}) 
+    print(io,x.content[1])
+end
+
+find(pred::MIME{mime}, x::PlainContent) where mime =
+    nothing
+
+find(pred::MIME{Symbol("text/plain")}, x::PlainContent) =
+    x
+
+find(pred::MIME{mime}, x::Content{Symbol("text/plain")}) where mime =
+    x
+
+function find(pred::MIME{mime}, x::Content{Symbol("multipart/mixed")}) where mime 
+    for sc in x.content
+        r = find(sc)
+        r !== nothing && return r
+    end
+end
 
 contentfield(::Val, x::Union{Nothing,AbstractString, Number}) = x
 contentfield(::Val{:content}, x::Union{Nothing,AbstractString, Number}) = x
@@ -56,11 +80,37 @@ function contentfield(::Val{:content}, x::AbstractVector)
     Content.(x)
 end
 
+function Content(x::AbstractVector)
+    @show x
+    Content.(x)
+end
+
 function Content(x::JSON3.Object)
     # @show x
-    Content{Symbol(x["content-type"])}(
-        (contentfield(Val{k}(), get(x,replace("$k", '_' => '-'), nothing))
-         for k in fieldnames(Content))...)
+    ct = get(x, "content-type", nothing)
+    if ct === nothing
+        @warn "unknown" x
+        error("$x")
+    else
+        Content{Symbol(ct)}(
+            (contentfield(Val{k}(), get(x,replace("$k", '_' => '-'), nothing))
+             for k in fieldnames(Content))...)
+    end
+end
+
+tagsymbols = Dict(
+    # "inbox" => "📥",
+    # "attachment" => "📎",
+    # "new" => "🆕",
+    # "spam" => "🤦",
+    # "unread" => "📩",
+)
+
+function printtag(io::IO,x)
+    printstyled(io, " ",
+                get(tagsymbols,x) do
+                    "#"*x
+                end; color=:cyan)
 end
 
 """
@@ -76,7 +126,7 @@ struct Email
     timestamp::DateTime
     date_relative::String
     tags::Vector{String}
-    body::Vector{Content}
+    body::Vector{Content} ## TODO: COntent
     crypto::Vector{String}
     headers::Headers
 end
@@ -84,25 +134,48 @@ Email(Nothing) = nothing
 Email(o::JSON3.Object) =
     Email((showfield(Val{k}(), get(o,"$k",nothing))
            for k in fieldnames(Email))...)
+Email(id::String; body=false, kw...) =
+    Email(first(flatten(notmuch_show("id:$id"; body = body, kw...))))
+
+show(id::String; body=false, kw...) =
+    first(flatten(notmuch_show("id:$id"; body = body, kw...)))
+
 
 function Base.show(io::IO, x::Email)
-    ae = author_email(x.headers.From)
-    print(io, x.date_relative, " ")
-    printstyled(io, ae.name == "" ? ae.email : ae.name; color=:yellow)
-    for t in x.tags
-        printstyled(io, " ", "#"*t; color=:cyan)
+    if get(io, :compact, true)
+        showline(io,x)
+    else
+        #ae = tryparse(author_email,x.headers.From)
+        printstyled(io, x.date_relative, " ")
+        printstyled(io, x.headers.From; color=:yellow)
+        for t in x.tags
+            printtag(io,t)
+        end
+        println(io)
+        printstyled(io, x.headers.Subject; bold=true)
+        for c in x.body
+            print(io, "\n", c)
+        end
     end
-    println(io)
-    printstyled(io, x.headers.Subject; bold=true, underline=true)
-    for c in x.body
-        print(io, "\n", c)
+end
+
+showline(x::Email) =
+    showline(stdout,x)
+
+function showline(io::IO, x::Email)
+    printstyled(io, x.timestamp, " ")
+    printstyled(io, x.headers.From; color=:yellow)
+    print(io,": ")
+    printstyled(io, x.headers.Subject, " "; bold=true)
+    for t in x.tags
+        printtag(io,t)
     end
 end
 
 showfield(::Val, x::Union{AbstractString, Bool, Number}) = x
 showfield(::Val, x::Union{AbstractArray}) = collect(x)
 
-showfield(::Val{:body}, x::Union{AbstractArray}) =  Content.(x)
+showfield(::Val{:body}, x::Union{AbstractArray}) =  Content(x)
 showfield(::Val{:body}, x::Nothing) = []
 
 showfield(::Val{:crypto}, x) = []
@@ -134,8 +207,40 @@ keepit(x::WithReplies) = true
 keepit(x::AbstractVector) = !isempty(x)
 
 simplify(x) = WithReplies(x)
+export flatten
+flatten(x::WithReplies) =
+    flatten!(Email[],x)
+flatten(x::AbstractVector) =
+    flatten!([],x)
 
-    
+flatten!(r::AbstractVector, x::Nothing) =
+    r
+
+function flatten!(r::Vector, x::WithReplies) 
+    x.message !== nothing && push!(r, x.message)
+    for e in x.replies
+        flatten!(r,e)
+    end
+    r
+end
+
+function flatten!(r::Vector, x::AbstractArray) 
+    for e in x
+        flatten!(r,e)
+    end
+    r
+end
+
+function flatten!(r::Vector, x::JSON3.Object) 
+    push!(r, x)
+    r
+end
+
+function flatten!(r::Vector, x::Email) 
+    push!(r, x)
+    r
+end
+
 struct Mailbox
     user::String
     domain::String

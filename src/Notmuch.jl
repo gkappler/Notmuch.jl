@@ -144,7 +144,7 @@ count messages matching the given search terms
 """
 function notmuch_count(x...; kw...)
     c = notmuch("count", x...; kw...)
-    c === nothing && return nothing
+    c === nothing && return 0
     parse(Int,chomp(c))
 end
 
@@ -316,10 +316,10 @@ end
 
 function tagcounts(query, a...; kw...)
     ts = Notmuch.notmuch_json("search", "--output=tags", a..., query; kw...)
-    [ (tag=t, count=parse(Int,chomp(
+    sort([ (tag=t, count=parse(Int,chomp(
         Notmuch.notmuch(
             "count", "($query) and tag:$t"; kw...))))
-          for t in ts ]
+          for t in ts ]; by = x -> x[2])
 end
 
 using Dates
@@ -759,7 +759,10 @@ function notmuch_show(query, x...; body = true, entire_thread=false, offset = 0,
     notmuch_json(:show, x..., "--body=$body", "--entire-thread=$(entire_thread)",
                  "($query) and ($threadq)"; kw...)
 end
-    
+
+part(parg, id::String; kw...) =
+    notmuch("show", "--part=$parg", "id:$id"; kw...)
+
 notmuch_show(T::ToF, x...; kw...) = T(notmuch_show(x...; kw...))
 export notmuch_show
 
@@ -782,141 +785,92 @@ export notmuch_tree
 
 
 
-export TagChange, notmuch_tag
-"""
-    TagChange(prefixtag::AbstractString)
-    TagChange(prefix::AbstractString, tag::AbstractString)
-
-Prefix is either "+" for adding or "-" for removing a tag.
-"""
-struct TagChange
-    prefix::String
-    tag::String
-    function TagChange(prefix, tag)
-        @assert prefix in ["+","-"]
-        new(prefix,tag)
-    end
-end
-
-function TagChange(tag)
-    TagChange(tag[1:1], tag[2:end])
-end
-
-Base.isequal(x::TagChange, y::TagChange) =
-    x.tag == y.tag
-
-Base.show(io::IO, x::TagChange) =
-    print(io, x.prefix, x.tag)
-
 using CombinedParsers
-elmail_api_tag_subject = Sequence(Either("+", "-"), !Repeat1(CharNotIn(" ")), " tag ", integer_base(10), " ", !Repeat(AnyChar())) do v
-    (query = v[6], rule = TagChange(v[1],v[2]), count = v[4])
-end;
+include("tag.jl")
 
-function tag_history(; kw...)
-    [ (;elmail_api_tag_subject(x.headers.Subject)..., date = x.timestamp)
-      for x in flatten(notmuch_show("tag:autotag"; body = false, kw...))
-          ]
-end
+include("mv.jl")
 
-"""
-    notmuch_tag(batch::Pair{<:AbstractString,<:AbstractString}...; kw...)
-    notmuch_tag(batch::Vector{Pair{String,TagChange}}; kw...)
-
-Tag `query => tagchange` entries in `batch` mode.
-
-Spaces in tags are supported, but other query string encodings for [`notmuch tag`](https://manpages.ubuntu.com/manpages//bionic/man1/notmuch-tag.1.html) are currently not.
-
-For user `kw...` see [`userENV`](@ref).
-"""
-function notmuch_tag(batch::Dict{<:AbstractString,<:AbstractVector{TagChange}};
-                     user = nothing,
-                     from= userEmail(user), to = String["elmail_api_tag@g-kappler.de"], body = "", kw...)
-    freshtags = Any[]
-    for (qq,tagchanges) in batch
-        for tc in unique(tagchanges)
-            q = "("*qq*") and (" * (tc.prefix == "+" ? " not" * tc.tag : "" ) * " tag:" * tc.tag  * ")"
-            N = Notmuch.notmuch_count(q; kw...)
-            if N > 0
-                ids = 
-                    Notmuch.notmuch_search(
-                        q, "--limit=$N", "--output=messages";
-                        limit = N, kw...)
-                folder, tags, rfc = if startswith(qq,"id:")
-                    "elmail/tag", [ TagChange("+tag") ], 
-                    rfc_mail(from = from, to = to, 
-                             in_reply_to = "<" * qq[4:end] * ">",
-                             subject = "$tc tag", body= body)
-                else
-                    "elmail/autotag", [ TagChange("+autotag") ],
-                    rfc_mail(from = from, to = to, 
-                             subject = "$tc tag $N $qq", body = body,
-                             attachments = 
-                                 [ SMTPClient.MimeContent{MIME{Symbol("notmuch/ids")}}(
-                                     "notmuch.ids",
-                                     ## 
-                                     join([tc.prefix * replace(tc.tag, " " => "%20") * " -- id:" * id for id in ids ]
-                                          ,"\n")
-                                 )
-                                   ]
-                             )
-                end
-                @info "$tc $N: $qq"
-                push!(freshtags,(rule = qq => tc, count = N))
-                notmuch_insert(rfc
-                               ; tags = [ tags..., TagChange("-inbox"), TagChange("-new") ]
-                               , folder= folder
-                               , kw...
-                                   )
-            end
+function is_spam(id; kw...)
+    file = notmuch_search("id:$id","--output=files"; limit=1, kw...)[1]
+    for l in eachline(file)
+        if l in [ "X-Spam-Flag: YES", "X-Spam: Yes" ]
+            return true
         end
+        ##println(l)
+        l == "" && break
     end
-    
-    ##cd(@show paths.home)
-    open(
-        Notmuch.notmuch_cmd(
-            "tag", "--batch"; kw...
-        ),
-        "w", stdout) do io
-            for (q, tagchanges) in batch
-                # println(tc.prefix,
-                #         replace(tc.tag, " " => "%20")
-                #         , " -- ", q)
-                for tc in tagchanges
-                    println(io, tc.prefix,
-                            replace(tc.tag, " " => "%20")
-                            , " -- ", q)
-                end
-            end
-            # close(io)
-        end
-    ##noENV!()
+    return false
 end
-notmuch_tag(batch::Pair{<:AbstractString,<:AbstractString}...; kw...) =
-    notmuch_tag(Dict(q => [TagChange(x)] for (q,x) in batch); kw...)
 
+function tag_spam(query="tag:new"; tag="spam", limit= 100, kw...)
+  for id in notmuch_search("($query) and (not tag:$tag)","--output=messages"; limit = limit, kw...)
+      if is_spam(id; kw...)
+          @info "spam id:$id"
+          println(Email(id; kw...))
+          notmuch_tag(Dict("id:$id" => [RuleMail2(TagChange("+",tag), nothing)]); kw...)
+      end
+  end
+end
 
+userEmail(user) = user === nothing ? "elmail_api_tag@" * ENV["host"] : user * "@" * ENV["host"]
 
 using SMTPClient
 export rfc_mail
-function rfc_mail(; from, to=String[], cc=String[], bcc=String[], subject, body, replyto="", message_id = "", in_reply_to="", references="", date = now(), attachments = String[], tags = String[], kw... )
-    ts = [ "#$tag" for tag in tags
-              if !(tag in ["inbox", "unread", "new", "flagged","draft","draftversion","attachment"])]
+"""
+        function rfc_mail(; from, to=String[], cc=String[], bcc=String[], subject, content,
+                  replyto="",
+                  message_id = "",
+                  in_reply_to="",
+                  references="",
+                  date = now(),
+                  keywords = String[], kw... )
+
+Return a `String` in RFC mail format.
+
+Joins `keywords` to `,` separated list and adds as `X-Keywords` to headers.
+
+See [`SMTPClient.get_body`](@ref).
+(Note changed keyword argument names.)
+"""
+function rfc_mail(; from, to=String[], cc=String[], bcc=String[], subject, content,
+                  replyto="",
+                  message_id = "",
+                  in_reply_to="",
+                  references="",
+                  date = now(),
+                  keywords = String[], kw... )
     io = SMTPClient.get_body(
         to, from,
-        subject * ( isempty(ts) ? "" : "   " * join(ts, " ")),
-        body; cc=cc,
+        subject,
+        content; cc=cc,
         bcc=bcc,
         replyto=replyto,
         messageid=message_id,
         inreplyto=in_reply_to,
         references=references,
         date=date,
-        attachments=attachments
+        headers = [ "X-Keywords" => join(replace.(keywords,","=>"-"), ",") ],
+        kw...
     )
     s = String(take!(io))
 end
-export rfc_mail
+
+# function Notmuch.rfc_mail(; from, to=String[], cc=String[], bcc=String[], subject, content, replyto="", message_id = "", in_reply_to="", references="", date = now(), kw... )
+#     io = SMTPClient.get_body(
+#         to, from,
+#         subject,
+#         content; cc=cc,
+#         bcc=bcc,
+#         replyto=replyto,
+#         messageid=message_id,
+#         inreplyto=in_reply_to,
+#         references=references,
+#         date=date,
+#     )
+#     s = String(take!(io))
+# end
+
+
 
 """
     notmuch_insert(mail; folder="juliatest")
@@ -924,12 +878,11 @@ export rfc_mail
 Insert `mail` as a mail file into `notmuch` (see `notmuch insert`).
 Writes a file and changes tags in xapian.
 """
-function notmuch_insert(mail; tags = ["new"], folder="elmail", kw...)
+function notmuch_insert(mail; tags::AbstractVector{TagChange} = TagChange[TagChange("+new")], folder="elmail", kw...)
     open(
         Notmuch.notmuch_cmd(
             "insert", "--create-folder" ,"--folder=$folder",
-            "-new",
-            ["+"*p for p in tags]...;
+            ["$p" for p in tags]...;
             kw...
                 ),
         "w", stdout) do io
@@ -946,29 +899,36 @@ include("msmtp.jl")
 function notmuch_config(; kw... )
     env = userENV(; kw...)
     cfg_file = joinpath(env["HOME"], ".notmuch-config")
-    parse_notmuch_cfg()(read(cfg_file, String))
+    tryparse(parse_notmuch_cfg(),read(cfg_file, String))
 end
 
 export parse_notmuch_config
 function parse_notmuch_cfg()
     line = !Atomic(Sequence(1, !re"[^\n]+", "\n"))
-    section = Sequence(2,"[", !re"[^]]+", "]", whitespace)
-    comment = Sequence(2,re"#+ *", !re"[^\n]*", "\n")
+    @with_names section = Atomic(Sequence(2,"[", !re"[^]]+", "]", whitespace))
+    @with_names comment = Atomic(Sequence(2,re"#+ *", !re"[^\n]*", "\n"))
     function splitter(key)
-        Sequence(
+        NamedParser(Symbol(key),Sequence(
             key, re" *= *",
             join(!re"[^;\n]+",";"), "\n") do v
                 (key = Symbol(key), value = v[3])
-            end
+                    end
+                    )
     end
+    whitespace_newline = !re" *\n"
     setting =
         Either(
             splitter("tags"),
             splitter("exclude_tags"),
+            splitter("primary_email"),
             splitter("other_email"),
-            Sequence(:key => !word, re" *= *", :value => line)
+            Sequence(:key => !Atomic(word), re" *= *", :value => Atomic(line)),
+            Either(
+                comment,
+                whitespace_newline) do v
+                    nothing
+                end
         )
-    whitespace_newline = !re" *\n"
     #
     Repeat(Either(
         Sequence(
@@ -981,17 +941,16 @@ function parse_notmuch_cfg()
                           if k !== nothing ]...
                               )
             end,
-        Repeat1(
-            Either(
-                comment,
-                whitespace_newline)) do v
-                    nothing
-                end
+        Either(
+            comment,
+            whitespace_newline) do v
+                nothing
+            end
     )) do v
         Dict(filter(x -> x!==nothing, v)...)
     end
 end
 
-
-
+include("Telegram.jl")
+include("gmi.jl")
 end

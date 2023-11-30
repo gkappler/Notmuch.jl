@@ -12,7 +12,8 @@ function msmtp_runqueue!(; kw...)
     env = userENV(; kw...)
     r = try
         h = joinpath(env["HOME"], ".msmtprc")
-        cmd = Cmd(`./msmtp-runqueue.sh -C $h`;
+        path = dirname(dirname(pathof(Notmuch)))
+        cmd = Cmd(`$path/msmtp-runqueue.sh -C $h`;
             env=env
             )
         @debug "sending msmtp..." cmd
@@ -36,9 +37,10 @@ For user `kw...` see [`userENV`](@ref).
 todo: `msmtp_sender` should be parsed from `rfc` content!
 """
 function msmtp(rfc; msmtp_sender = env_msmtp_sender(),
-               mailfile = Dates.format(now(),"yyyy-mm-dd-HH.MM.SS"), kw... )
+               mailfile = Dates.format(now(),"yyyy-mm-dd-HH.MM.SS")* join(rand(collect(vcat('a':'z')), 5)), kw... )
     env = userENV(; kw...)
-    mail_dir = joinpath(env["HOME"], ".msmtpqueue")
+    mail_dir = joinpath(env["MAILDIR"], ".msmtpqueue")
+    checkpath!(mail_dir)
     open(joinpath(mail_dir, "$mailfile.msmtp"), "w") do io
         println(io, "-oi -f $msmtp_sender -t")
     end
@@ -52,7 +54,11 @@ end
 function msmtp_config(;kw... )
     env = userENV(; kw...)
     cfg_file = joinpath(env["HOME"], ".msmtprc")
-    Repeat(parse_msmtp_cfg())(read(cfg_file, String))
+    try
+        Repeat(parse_msmtp_cfg())(read(cfg_file, String))
+    catch e
+        []
+    end
 end
 
 # function msmtp_daemon(sleep_seconds=5)

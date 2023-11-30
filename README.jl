@@ -23,7 +23,7 @@
 # sudo apt install notmuch offlineimap msmtp
 # ```
 #
-# Install my SMTPClient fork:
+# Install my SMTPClient fork
 # ```julia
 # ] add https://github.com/gkappler/SMTPClient.jl
 # ```
