@@ -13,6 +13,7 @@ Literate = "98b081ad-f1c9-55d3-8b20-4c87d4299306"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
 LoggingExtras = "e6f89c97-d47a-5376-807f-9c37f3926c36"
 MbedTLS = "739be429-bea8-5141-9913-cc70e7f3736d"
+Parameters = "d96e819e-fc66-5662-9728-84c9c7592b0a"
 SMTPClient = "c35d69d1-b747-5018-a192-25bc5e63c83d"
 TextParse = "e0df1984-e451-5cb5-8b61-797a481e67e3"
 
