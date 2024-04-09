@@ -146,12 +146,12 @@ function tag_new(q="tag:autotag"; user=nothing, pars...)
     [ r for r in Notmuch.tag_history(; pars..., user = user) ]
 end
 
-function message_ids(q; kw...)
-    N = Notmuch.notmuch_count(q; kw...)
-    if N > 0
+function message_ids(q; limit = missing, kw...)
+    limit = limit === missing ? Notmuch.notmuch_count(q; kw...) : limit
+    if limit > 0
             Notmuch.notmuch_search(
-                q, "--limit=$N", "--output=messages";
-                limit = N, kw...)
+                q, "--limit=$limit", "--output=messages";
+                limit = limit, kw...)
     else
         []
     end
@@ -167,6 +167,7 @@ end
 Base.convert(::Type{TagChange}, x::RuleMail2) =
     x.rule
 
+export notmuch_tag
 """
     notmuch_tag(batch::Pair{<:AbstractString,<:AbstractString}...; kw...)
     notmuch_tag(batch::Vector{Pair{String,TagChange}}; kw...)
@@ -208,15 +209,15 @@ function notmuch_tag(batch::Dict{<:AbstractString,<:AbstractVector{RuleMail2}};
                                          end,
                                          content = 
                                              MultiPart(:mixed,
-                                                       [ SMTPClient.Plain(body),
-                                                         SMTPClient.MimeContent(
+                                                       SMTPClient.Plain(body),
+                                                       SMTPClient.MIMEContent(
                                                              "notmuch.ids",
                                                              ## 
                                                              join([tc.rule.prefix * replace(tc.rule.tag, " " => "%20") * " -- id:" * id
                                                                    for id in ids ]
                                                                   ,"\n")
                                                          )
-                                                         ])
+                                                       )
                                          ))
                 end
             end

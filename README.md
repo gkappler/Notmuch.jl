@@ -12,7 +12,7 @@ Emails need to be stored in maildir standard.
 
 On linux with a `notmuch` setup your user mails are searched by default.
 Keyword argument `user` switches the `maildir` (and database) to
-`joinpath(ENV["NOTMUCHJL"],"home")`.
+`joinpath(ENV["NOTMUCH_WD"],"home")`.
 
 (Please note, that this package is a prerelease, and such names might still change.)
 

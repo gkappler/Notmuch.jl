@@ -5,6 +5,12 @@ function new(; kw...)
      , spam = tag_spam(; kw...)
      )
 end
+
+"""
+        sync(; kw...)
+
+sync with [`Notmuch.offlineimap.sync`](@ref) and [`Notmuch.gmi.sync`](@ref).
+"""
 function sync(; kw...)
     (Notmuch.offlineimap.sync(; kw...)
      , Notmuch.gmi.sync(; kw...)

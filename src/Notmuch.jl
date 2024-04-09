@@ -812,7 +812,10 @@ function tag_spam(query="tag:new"; tag="spam", limit= 100, kw...)
   end
 end
 
-userEmail(user) = user === nothing ? "elmail_api_tag@" * ENV["host"] : user * "@" * ENV["host"]
+function userEmail(user)
+    host = get(ENV,"host", "Notmuch")
+    user === nothing ? "elmail_api_tag@" * host : user * "@" * host
+end
 
 using SMTPClient
 export rfc_mail
@@ -849,7 +852,7 @@ function rfc_mail(; from, to=String[], cc=String[], bcc=String[], subject, conte
         inreplyto=in_reply_to,
         references=references,
         date=date,
-        headers = [ "X-Keywords" => join(replace.(keywords,","=>"-"), ",") ],
+        headers = isempty(keywords) ? [] : [ "X-Keywords" => join(replace.(keywords,","=>"-"), ",") ],
         kw...
     )
     s = String(take!(io))
@@ -949,6 +952,10 @@ function parse_notmuch_cfg()
     )) do v
         Dict(filter(x -> x!==nothing, v)...)
     end
+end
+
+function replies(id)
+    notmuch_search
 end
 
 include("Telegram.jl")

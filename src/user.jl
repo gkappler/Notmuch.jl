@@ -16,12 +16,13 @@ If `user === nothing` use
 
 See [`notmuch_cmd`](@ref), [`offlineimap!`](@ref), and [`msmtp_runqueue!`](@ref)
 """
-function userENV(; workdir= get(ENV,"NOTMUCHJL",pwd())
+function userENV(; workdir= get(ENV,"NOTMUCH_WD",pwd())
                  , homes = joinpath(workdir, "home")
-                 , user = nothing, kw...)
+                 , user = get(ENV,"NOTMUCH_USER",nothing), kw...)
     if user === nothing || user == ""
-        Dict("HOME" => get(ENV,"NOHOME",ENV["HOME"])
-             , "MAILDIR" => get(ENV,"NOMAILDIR", ENV["MAILDIR"]))
+        home = get(ENV,"NOHOME",ENV["HOME"])
+        Dict("HOME" => home
+             , "MAILDIR" => get(ENV,"NOMAILDIR", get(ENV,"MAILDIR",home)))
     else
         Dict("HOME" => joinpath(homes,user)
              , "MAILDIR" => joinpath(homes,user,"maildir"))
