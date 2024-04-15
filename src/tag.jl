@@ -108,6 +108,8 @@ function attachments(x::JSON3.Object)
         end
     elseif hasproperty(x, Symbol("content-disposition")) && x["content-disposition"] == "attachment"
         x
+    elseif hasproperty(x, Symbol("content-type")) && x["content-type"] == "text/html"
+        nothing
     else
         @warn ("invalid $x")
         nothing
