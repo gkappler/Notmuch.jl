@@ -44,7 +44,7 @@ elmail_api_tag_subject = Either(
     Sequence(Either("+", "-"), !Repeat1(CharNotIn(" ")), " tag ", integer_base(10), " ", !Repeat(AnyChar())) do v
         (query = v[6], rule = TagChange(v[1],v[2]), count = v[4])
     end,
-    Sequence("Notmuch.RuleMail2(",
+    Sequence("Notmuch.MailTagChange(",
              :rule => map(TagChange,!Sequence(Either("+", "-"),!Repeat1(CharNotIn(" ")))),
              ", \"", :id => !Repeat_until(AnyChar(), "\") tag "),
              :count => integer_base(10), " ",
@@ -118,13 +118,16 @@ function attachments(id::String; kw...)
     attachments(Notmuch.show(id; body=true, kw...))
 end
 
-struct RuleMail2
+struct MailTagChange
     rule::TagChange
     mailid::Union{String, Nothing}
 end
 
+Base.show(io::IO, x::MailTagChange) =
+    print(io,x.rule)
+
 function tag_new(q="tag:autotag"; user=nothing, pars...)
-    tcs = Dict{String, Vector{RuleMail2}}()
+    tcs = Dict{String, Vector{MailTagChange}}()
     for r in tagrules(q; pars..., user = user)
         tagrule = r.first
         queries = r.second
@@ -136,9 +139,9 @@ function tag_new(q="tag:autotag"; user=nothing, pars...)
                 end
             end
             push!(get!(tcs, query) do
-                      RuleMail2[]
+                      MailTagChange[]
                   end,
-                  RuleMail2(tagrule, history[1].id)
+                  MailTagChange(tagrule, history[1].id)
                   )
         end
     end
@@ -164,7 +167,7 @@ end
 end
 
 
-Base.convert(::Type{TagChange}, x::RuleMail2) =
+Base.convert(::Type{TagChange}, x::MailTagChange) =
     x.rule
 
 export notmuch_tag
@@ -178,7 +181,7 @@ Spaces in tags are supported, but other query string encodings for [`notmuch tag
 
 For user `kw...` see [`userENV`](@ref).
 """
-function notmuch_tag(batch::Dict{<:AbstractString,<:AbstractVector{RuleMail2}};
+function notmuch_tag(batch::Dict{<:AbstractString,<:AbstractVector{MailTagChange}};
                      user = nothing,#
                      dryrun = false,
                      from= userEmail(user), to = String["elmail_api_tag@g-kappler.de"],
@@ -262,12 +265,12 @@ end
 notmuch_tag(batch::Dict{<:AbstractString,<:AbstractSet{TagChange}}; kw...) =
     notmuch_tag(Dict(q => collect(x) for (q,x) in batch); kw...)
 notmuch_tag(batch::Pair{<:AbstractString,<:AbstractString}...; kw...) =
-    notmuch_tag(Dict(q => [RuleMail2(TagChange(t), nothing) for t in split(x," ")]
+    notmuch_tag(Dict(q => [MailTagChange(TagChange(t), nothing) for t in split(x," ")]
                      for (q,x) in batch); kw...)
 
 notmuch_tag(batch::Pair{<:AbstractString,<:TagChange}...; kw...) =
     notmuch_tag(Dict(q => [x] for (q,x) in batch); kw...)
 notmuch_tag_from(batch::Pair{<:AbstractString,<:AbstractString}...; kw...) =
-    notmuch_tag(Dict("from:$f" => [RuleMail2(TagChange(t), nothing) for t in split(x," ")]
+    notmuch_tag(Dict("from:$f" => [MailTagChange(TagChange(t), nothing) for t in split(x," ")]
                      for (f,x) in batch); kw...)
     
