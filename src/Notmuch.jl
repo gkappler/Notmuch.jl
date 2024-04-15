@@ -763,6 +763,17 @@ end
 part(parg, id::String; kw...) =
     notmuch("show", "--part=$parg", "id:$id"; kw...)
 
+
+function save(id, att; work_path = pwd(), kw...)
+    file = joinpath(work_path, att.filename)
+    @debug "writing attachment $file"
+    open(file,"w") do io
+        print(io, Notmuch.part(att.id, id; kw...))
+    end
+    file
+end
+
+
 notmuch_show(T::ToF, x...; kw...) = T(notmuch_show(x...; kw...))
 export notmuch_show
 
