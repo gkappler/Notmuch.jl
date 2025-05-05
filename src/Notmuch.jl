@@ -1,6 +1,7 @@
 """
 `Notmuch.jl` opens maildir email data up for analyses in Julia by
-providing a julia `Cmd` wrapper for [notmuch mail](https://notmuchmail.org/) database supporting arbitrary tags and advanced search.
+providing a julia `Cmd` wrapper for [notmuch mail](https://notmuchmail.org/)
+database supporting arbitrary tags and advanced search.
 
 Notmuch mail indexes emails into a xapian database from a maildir store.
 
@@ -316,10 +317,19 @@ end
 
 function tagcounts(query, a...; kw...)
     ts = Notmuch.notmuch_json("search", "--output=tags", a..., query; kw...)
-    sort([ (tag=t, count=parse(Int,chomp(
-        Notmuch.notmuch(
-            "count", "($query) and tag:$t"; kw...))))
-          for t in ts ]; by = x -> x[2])
+    iob = IOBuffer()
+    open(
+        Notmuch.notmuch_cmd(
+            "count", "--batch"; kw...
+                ),
+        "w", iob) do io
+            for t in ts
+                println(io, "($query) and tag:$t")
+            end
+        end
+    result = split(String(take!(iob)),"\n")
+    sort([ (tag=t, count=parse(Int,c))
+          for (t,c) in zip(ts,result) ]; by = x -> x[2])
 end
 
 using Dates
@@ -330,6 +340,24 @@ function date_query(from,to)
     "date:@$(unixstring(from))..@$(unixstring(to))"
 end
 
+
+
+"""
+This function `count_timespan` returns the timestamp for the first and last
+elements and the total count of a notmuch search.
+
+@param q    The notmuch query string.
+@param a    Additional arguments to pass to the notmuch search command.
+@param kw   Keywords to pass to the notmuch search command.
+
+The function `query_timestamp` retrieves the timestamp for a specific notmuch query.
+
+@return     If the count is zero, the function will return nothing. 
+            Otherwise, it returns a tuple containing:
+            - `from`: Timestamp of the oldest query result,
+            - `to`: Timestamp of the newest query result,
+            - `count`: The total count of the query result
+"""
 function count_timespan(q, a...; kw...)
     function query_timestamp(q, b...)
         ns = notmuch_search(Thread,q,b...; limit=1, kw...)
@@ -367,6 +395,7 @@ end
 
 function time_counts(q, a...; target=1000, eps = 10, maxiter = 10, kw...)
     span = count_timespan(q, a...; kw...)
+    span === nothing && return nothing
     to = span.to
     from = span.from
     r = [span]
@@ -525,14 +554,16 @@ From the man page:
 """
 function notmuch_address(q, a...; target=1000, kw...)
     if target !== nothing
-        tc = time_counts(q; target=target, kw... ).probes
-        span=tc[end]
+        tc = time_counts(q; target=target, kw... )
+        tc === nothing && return (timespan_counts = [], address = [], count = 0)
+        span=tc.probes[end]
         from = span.from
         to = span.to
         timec = date_query(from,to)
         q_ = "($q) and ($timec)"
-        (timespan_counts = tc
-         , address = notmuch_json( :address, a...,  q_; kw..., log=true))
+        (timespan_counts = tc.probes
+         , address = notmuch_json( :address, a...,  q_; kw..., log=true)
+         , count = notmuch_count(q_))
     else
         (timespan_counts = []
          , address = notmuch_json( :address, a...,  q; kw..., log=true))
@@ -801,6 +832,9 @@ include("tag.jl")
 
 include("mv.jl")
 
+export notmuch_files
+notmuch_files(q; kw...) =
+    notmuch_search(q,"--output=files"; kw...)
 function is_spam(id; kw...)
     file = notmuch_search("id:$id","--output=files"; limit=1, kw...)[1]
     for l in eachline(file)
@@ -818,7 +852,7 @@ function tag_spam(query="tag:new"; tag="spam", limit= 100, kw...)
       if is_spam(id; kw...)
           @info "spam id:$id"
           println(Email(id; kw...))
-          notmuch_tag(Dict("id:$id" => [RuleMail2(TagChange("+",tag), nothing)]); kw...)
+          notmuch_tag(Dict("id:$id" => [MailTagChange(TagChange("+",tag), nothing)]); kw...)
       end
   end
 end
@@ -856,14 +890,15 @@ function rfc_mail(; from, to=String[], cc=String[], bcc=String[], subject, conte
     io = SMTPClient.get_body(
         to, from,
         subject,
-        content; cc=cc,
+        content;
+        cc=cc,
         bcc=bcc,
         replyto=replyto,
         messageid=message_id,
         inreplyto=in_reply_to,
         references=references,
         date=date,
-        headers = isempty(keywords) ? [] : [ "X-Keywords" => join(replace.(keywords,","=>"-"), ",") ],
+        keywords=keywords,
         kw...
     )
     s = String(take!(io))
@@ -910,33 +945,62 @@ include("Show.jl")
 
 include("msmtp.jl")
 
+function maildirs(base, outbase="", result=String[]; kw... )
+    ismaildir(f) = isdir(joinpath(f,"cur")) && isdir(joinpath(f,"new")) && isdir(joinpath(f,"tmp"))
+    env = userENV(; kw...)
+    subfolders = [ f for f in readdir(joinpath(env["HOME"], base))
+                      if isdir(joinpath(env["HOME"], base,f))
+                          ]
+    for f in subfolders
+        if ismaildir(joinpath(env["HOME"], base,f))
+            push!(result, joinpath(outbase,f))
+        else
+            maildirs(joinpath(base,f), joinpath(outbase,f), result; kw... )
+        end
+    end
+    result
+end
+
+export notmuch_config
 function notmuch_config(; kw... )
     env = userENV(; kw...)
     cfg_file = joinpath(env["HOME"], ".notmuch-config")
-    tryparse(parse_notmuch_cfg(),read(cfg_file, String))
+    result = tryparse(parse_notmuch_cfg(),read(cfg_file, String); trace=true, log=true)
+    if result isa Dict
+        result[:folders]= maildirs(result[:database][:path]; kw...)
+        result
+    end
+end
+
+function splitter(key; delim=";")
+    NamedParser(Symbol(key),Sequence(
+        key, re" *= *",
+        join(!Regcomb("[^$delim\n]+"),delim), "\n") do v
+                (key = Symbol(key), value = strip.(v[3]))
+                end
+                )
 end
 
 export parse_notmuch_config
 function parse_notmuch_cfg()
-    line = !Atomic(Sequence(1, !re"[^\n]+", "\n"))
+    parse_cfg(
+        splitter("tags"),
+        splitter("exclude_tags"),
+        splitter("primary_email"),
+        splitter("other_email")
+    )
+end
+
+export parse_notmuch_config
+function parse_cfg(keyvalues...)
+    line = !Atomic(Sequence(1, !re"[^\n]+"))
     @with_names section = Atomic(Sequence(2,"[", !re"[^]]+", "]", whitespace))
-    @with_names comment = Atomic(Sequence(2,re"#+ *", !re"[^\n]*", "\n"))
-    function splitter(key)
-        NamedParser(Symbol(key),Sequence(
-            key, re" *= *",
-            join(!re"[^;\n]+",";"), "\n") do v
-                (key = Symbol(key), value = v[3])
-                    end
-                    )
-    end
+    @with_names comment = Atomic(Sequence(2,re"#+ *", !re"[^\n]*"))
     whitespace_newline = !re" *\n"
     setting =
         Either(
-            splitter("tags"),
-            splitter("exclude_tags"),
-            splitter("primary_email"),
-            splitter("other_email"),
-            Sequence(:key => !Atomic(word), re" *= *", :value => Atomic(line)),
+            keyvalues...,
+            Sequence(:key => !Atomic(re"[a-zA-Z0-9_]+"), re" *= *", :value => Atomic(line)),
             Either(
                 comment,
                 whitespace_newline) do v
@@ -944,10 +1008,15 @@ function parse_notmuch_cfg()
                 end
         )
     #
+    ignored = Either(
+        comment,
+        whitespace_newline) do v
+            nothing
+        end
     Repeat(Either(
         Sequence(
             section,
-            Repeat(setting)) do v
+            Repeat(Either(ignored,setting))) do v
                 sect,set = v
                 Symbol(sect) => Dict(
                     [ (Symbol(k.key) => k.value)
@@ -955,14 +1024,18 @@ function parse_notmuch_cfg()
                           if k !== nothing ]...
                               )
             end,
-        Either(
-            comment,
-            whitespace_newline) do v
-                nothing
-            end
+        ignored
     )) do v
-        Dict(filter(x -> x!==nothing, v)...)
+        Dict{Symbol,Any}(filter(x -> x!==nothing, v)...)
     end
+end
+
+function offlineimap_config(;kw... )
+    env = userENV(; kw...)
+    cfg_file = joinpath(env["HOME"], ".offlineimaprc")
+    prsr = (parse_cfg(
+        splitter("accounts";delim=",")))
+    parse(prsr,read(cfg_file, String))
 end
 
 function replies(id)
@@ -971,4 +1044,13 @@ end
 
 include("Telegram.jl")
 include("gmi.jl")
+
+function summary(q,a...; kw...)
+    (count = notmuch_count(q, a...; kw...)
+     , to = notmuch_address(q,"--output=recipients", "--output=count", "--deduplicate=address",a...; kw...).address
+     , from = notmuch_address(q,"--output=count", "--deduplicate=address",a...; kw...).address
+     , tags = tagcounts(q,a...; kw...)
+     )
+end
+
 end

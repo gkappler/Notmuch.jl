@@ -1,11 +1,10 @@
-
-notmuch_mv(query::AbstractString="tag:new", a...; kw...) =
+export notmuch_mv
+notmuch_mv(query::AbstractString, a...; kw...) =
     notmuch_mv(x -> replace(x, a...), query; kw...)
 
 
 function notmuch_mv(query::AbstractString, p::Pair{<:AbstractString,<:AbstractString}; kw...)
-    rq = replace(p.first, "/" => "\\/", "." => "\\.")
-    notmuch_mv(x -> replace(x, p), query * " and folder:/$rq/"; kw...)
+    notmuch_mv(x -> replace(replace(x, p),r"(cur|new)/.*/([^/]*)" => s"\1/\2"), query * " and path:\"$(p.first)**\""; kw...)
 end
 
 
@@ -27,15 +26,17 @@ function ynp(x)
         false
     end
 end
-
-function notmuch_mv(f::Function, query="tag:new";
+function notmuch_folders(kw...)
+end
+function notmuch_mv(f::Function, query;
                     dryrun = true, do_mkdir = ynp,
                     kw...)
+    @info "moving" query
     touched = false
     tasks = Dict()    
     for mailid in notmuch_search(query, "--output=messages"; kw...) ##"--output=files"
         mail = Email(mailid)
-        #println(mail)
+        ##println(mail)
         for file in notmuch_search("id:$mailid", "--output=files"; kw...)
             #println(file)
             tf = f(file)
@@ -70,18 +71,18 @@ function notmuch_mv(f::Function, query="tag:new";
                 @info "moving $(length(files)) files to folder" folder
                 if dryrun
                     for ((mail,file),tf) in files
-                        println("# move ", mail)
+                        println(IOContext(stdout, :compact => true), "# move ", mail)
                         println("mv \"$file\" \"$tf\"")
                     end
                 else
                     ids = [f[1][1] for f in files]
                     for ((mail,file),tf) in files
                         try
-                            println("moving ", mail)
-                            mv(file,tf)
+                            @info "moving " mail file joinpath(folder,tf)
+                            mv(file,joinpath(folder,tf), force=true)
                             touched = true
                         catch e
-                            print(e)
+                            println(e)
                             #print(String(read(file)))
                         end
                     end

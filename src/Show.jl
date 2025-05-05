@@ -134,10 +134,11 @@ Email(Nothing) = nothing
 Email(o::JSON3.Object) =
     Email((showfield(Val{k}(), get(o,"$k",nothing))
            for k in fieldnames(Email))...)
-Email(id::String; body=false, kw...) =
-    Email(first(flatten(notmuch_show("id:$id"; body = body, kw...))))
-
-show(id::String; body=false, kw...) =
+function Email(id::AbstractString; body=false, kw...)
+    r = flatten(notmuch_show("id:$id"; body = body, kw...))
+    isempty(r) ? nothing : Email(first(r))
+end
+show(id::AbstractString; body=false, kw...) =
     first(flatten(notmuch_show("id:$id"; body = body, kw...)))
 
 

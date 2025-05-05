@@ -19,6 +19,7 @@ See [`notmuch_cmd`](@ref), [`offlineimap!`](@ref), and [`msmtp_runqueue!`](@ref)
 function userENV(; workdir= get(ENV,"NOTMUCH_WD",pwd())
                  , homes = joinpath(workdir, "home")
                  , user = get(ENV,"NOTMUCH_USER",nothing), kw...)
+    user = user === "" ? nothing : user
     if user === nothing || user == ""
         home = get(ENV,"NOHOME",ENV["HOME"])
         Dict("HOME" => home
@@ -30,7 +31,7 @@ function userENV(; workdir= get(ENV,"NOTMUCH_WD",pwd())
 end
 
 export usernames
-function usernames(; workdir= get(ENV,"NOTMUCHJL",pwd())
+function usernames(; workdir= get(ENV,"NOTMUCH_WD",pwd())
                    , homes = joinpath(workdir, "home"))
     filter(x->isdir(joinpath(homes,x)), readdir(homes))
 end

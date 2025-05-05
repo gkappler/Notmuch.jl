@@ -33,18 +33,37 @@ function TagChange(tag)
 end
 
 Base.isequal(x::TagChange, y::TagChange) =
-    x.tag == y.tag
+    x.tag == y.tag && x.prefix == y.prefix
 
-Base.show(io::IO, x::TagChange) =
-    print(io, x.prefix, x.tag)
+Base.isless(x::TagChange, y::TagChange) =
+    isless(x.prefix, y.prefix) || (isequal(x.prefix, y.prefix)  && isless(x.tag, y.tag))
 
+function Base.show(io::IO, x::TagChange)
+    removed = x.prefix == "-"
+    str = if removed
+        styled"{:{bright_red:$(x.prefix)$(x.tag)}}{strikethrough:{cyan:}}"
+    else
+        styled"{bold:{bright_green:$(x.prefix)$(x.tag)}}{cyan:}"
+    end
+    print(io, str)
+end
 
 
 elmail_api_tag_subject = Either(
-    Sequence(Either("+", "-"), !Repeat1(CharNotIn(" ")), " tag ", integer_base(10), " ", !Repeat(AnyChar())) do v
-        (query = v[6], rule = TagChange(v[1],v[2]), count = v[4])
+    Sequence(Either("+", "-"),
+             !Repeat1(CharNotIn(" "))
+             , " tag ", integer_base(10),
+             " ", !Repeat(AnyChar())) do v
+                 (query = v[6]
+                  , rule = TagChange(v[1],v[2])
+                  , count = v[4])
     end,
     Sequence("Notmuch.MailTagChange(",
+             :rule => map(TagChange,!Sequence(Either("+", "-"),!Repeat1(CharNotIn(" ")))),
+             ", \"", :id => !Repeat_until(AnyChar(), "\") tag "),
+             :count => integer_base(10), " ",
+             :query => !Repeat(AnyChar())),
+    Sequence("Notmuch.RuleMail2(",
              :rule => map(TagChange,!Sequence(Either("+", "-"),!Repeat1(CharNotIn(" ")))),
              ", \"", :id => !Repeat_until(AnyChar(), "\") tag "),
              :count => integer_base(10), " ",
@@ -52,14 +71,63 @@ elmail_api_tag_subject = Either(
     map(x-> (subject = x,), !Repeat(AnyChar()))
 );
 
+function notmuch_query_parser()
+    crit(x) = map(Sequence(x,":", !re"[^ :]+")) do v
+        NotmuchLeaf{Symbol(x)}(v[3])
+    end
+    @with_names atomic_term = Either(CombinedParser[crit(k) for k in ["from", "tag", "to", "id","thread","date","folder" ] ])
+    @with_names leaf_term = Either(CombinedParser[
+        map(Sequence(re" *not +", atomic_term)) do v
+            NotmuchLeaf{:not}(v[2])
+        end
+        , atomic_term])
+    
+    ort = map(join(leaf_term, re" +or +")) do v
+        or_query(v...)
+    end
+    term = map(join(ort, re" +and +")) do v
+        and_query(v...)
+    end
+    pushfirst!(atomic_term, with_name(:parenthesis,Sequence(2,re" *\( *",term,re" *\) *")))
+           
+    Sequence(1,term,AtEnd())
+end
+struct NotmuchQueryOperator{op}
+    subqueries::Vector{Any}
+end
+struct NotmuchLeaf{op}
+    value::Any
+end
+function StyledStrings.annotatedstring(x::NotmuchLeaf{op}) where op
+    colors = Dict(:tag => :light_blue, :from => :yellow, :fromto => :yellow, :to => :green)
+    styled"{$(get(colors,op,:white)):$op}:{$(get(colors,op,:white)):$(x.value)}"
+end
+function StyledStrings.annotatedstring(x::NotmuchQueryOperator{op}) where op
+    join(annotatedstring.(x.subqueries), " $op ")
+end
 
+Base.show(io::IO,x::Union{NotmuchQueryOperator, NotmuchLeaf}) =
+    print(io, annotatedstring(x))
+
+and_query(x) = x
+or_query(x) = x
+and_query(x1,x...) = NotmuchQueryOperator{:and}(Any[x1,x...])
+or_query(x1::NotmuchLeaf{:from},x2::NotmuchLeaf{:to}) =
+    if x1.value==x2.value
+        NotmuchLeaf{:fromto}(x1.value)
+    else
+        NotmuchQueryOperator{:or}(Any[x1,x...])
+    end
+or_query(x1,x...) = NotmuchQueryOperator{:or}(Any[x1,x...])
+and_query(x1::NotmuchQueryOperator{:and},x...) = NotmuchQueryOperator{:and}(Any[x1.subqueries...,x...])
+or_query(x1::NotmuchQueryOperator{:or},x...) = NotmuchQueryOperator{:or}(Any[x1.subqueries...,x...])
 """
 
 autotag:
 - get history
 """
 function tag_history(q="tag:autotag"; limit = 1000, kw...)
-    [ (;elmail_api_tag_subject(x.headers.Subject)..., date = unix2datetime(x.timestamp), id=x.id)
+    [ (;elmail_api_tag_subject(x.headers.Subject)..., date = unix2datetime(x.timestamp), id=x.id, filename = x.filename, tags = x.tags)
       for x in flatten(notmuch_show(q; limit=limit, body = false, kw...))
           ]
 end
@@ -68,26 +136,28 @@ end
 isid(x) =
     startswith(x,"id:")
 
-function tagrules(q="tag:autotag"; kw...)
+function tagrules(q="tag:autotag"; remove_errors=true, kw...)
     history = tag_history(q; kw...)
     tcs = Dict()
     for r in history
-        if  hasproperty(r, :query)
-            if isid(r.query)
-                @info "remove #autotag from $(r.query)"
-                notmuch_tag("id:$(r.id)" => "-autotag"; log_mail = ids -> nothing)
-            else hasproperty(r, :rule)
-                rd = get!(
-                    get!(tcs, r.rule) do
-                        Dict()
-                    end,
-                    r.query) do
-                        []
-                    end
-                push!(rd, (date = r.date, count = r.count, id = r.id) )
-            end
+        if r.count > 0
+            rd = get!(
+                get!(tcs, r.rule) do
+                    Dict()
+                end,
+                r.query) do
+                    []
+                end
+            push!(rd, (date = r.date, count = r.count, id = r.id, filename=r.filename) )
         else
             @warn "unknown email" r
+            for f in r.filename
+                if remove_errors
+                    rm(f)
+                else
+                    println("rm $f")
+                end
+            end
         end
     end
     tcs
