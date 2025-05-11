@@ -1,4 +1,5 @@
-function new(; kw...)
+export notmuch_new
+function notmuch_new(; kw...)
     rnew = notmuch("new"; kw...)
     ( new = rnew
      , tag = tag_new(; kw...)
@@ -17,8 +18,12 @@ function sync(; kw...)
      )
 end
 
+macro asynchronize()
+    @async sync()
+end
+
 module offlineimap
-import ..Notmuch: userENV, new
+import ..Notmuch: userENV, notmuch_new
 
 function execute(cmd::Base.Cmd)
     out = IOBuffer()
@@ -34,7 +39,6 @@ end
 
 Run system Cmd `offlineimap`,  [`notmuch`](@ref)`("new"), [`tag_spam`](@ref), and [`tag_new`](@ref).
 Returns Namedtuple output of these.
-
 For user `kw...` see [`userENV`](@ref).
 """
 function sync(; cfg = ".offlineimaprc", kw...)
@@ -46,7 +50,7 @@ function sync(; cfg = ".offlineimaprc", kw...)
         @error "offlineimap error" e
     end
     (offlineimap = r
-     , notmuch = new(; kw...))
+     , notmuch_new = notmuch_new(; kw...))
 end
 
 end
@@ -55,7 +59,7 @@ end
 
 
 module gmi
-import ..Notmuch: userENV, new 
+import ..Notmuch: userENV, notmuch_new 
 """
     sync(; cfg = ".offlineimaprc", kw...)
 
@@ -78,7 +82,7 @@ function sync(; cfg = ".gmirc", kw...)
           for p in readlines(joinpath(env["HOME"], cfg))
               ]
     (gmi = r
-     , notmuch = new(; kw...))
+     , notmuch_new = notmuch_new(; kw...))
 end
 
 
@@ -96,7 +100,7 @@ function send()
           for p in readlines(joinpath(env["HOME"], cfg))
               ]
     (gmi = r
-     , notmuch = new(; kw...))
+     , notmuch_new = notmuch_new(; kw...))
 end
 
 end

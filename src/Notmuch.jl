@@ -12,28 +12,119 @@ maildir
 Genie routes are provided exposing notmuch search as an HTTP API.
 """
 module Notmuch
+using DataFrames
+using StyledStrings
+using PrettyTables
 
 using JSON3
 
 using Logging, LoggingExtras
 
-"""
-    Key = Union{AbstractString,Symbol} 
+include("Threads.jl")
 
-Genie GET and POST key type.
-"""
-Key = Union{AbstractString,Symbol}
+ToF = Union{Type,Function}
+LIMIT = 5
 
-function main()
-  Core.eval(Main, :(const UserApp = $(@__MODULE__)))
 
-  Genie.genie(; context = @__MODULE__)
 
-  Core.eval(Main, :(const Genie = UserApp.Genie))
-  Core.eval(Main, :(using Genie))
+struct NotmuchQueryOperator{op}
+    subqueries::Vector{Any}
+end
+struct NotmuchLeaf{op}
+    value::Any
 end
 
-include("genie.jl")
+function StyledStrings.annotatedstring(x::NotmuchLeaf{:not})
+    styled"{bright_red:not} {bright_red:$(x.value)}"
+end
+
+function StyledStrings.annotatedstring(x::NotmuchLeaf{op}) where op
+    colors = Dict(:tag => :light_blue, :from => :yellow, :fromto => :yellow, :to => :green)
+    styled"{$(get(colors,op,:white)):$op}:{$(get(colors,op,:white)):$(x.value)}"
+end
+function StyledStrings.annotatedstring(x::NotmuchQueryOperator{op}) where op
+    join(annotatedstring.(x.subqueries), " $op ")
+end
+
+Base.show(io::IO,x::Union{NotmuchQueryOperator, NotmuchLeaf}) =
+    print(io, annotatedstring(x))
+
+Query = Union{NotmuchQueryOperator,NotmuchLeaf}
+and_query(x) = x
+or_query(x) = x
+and_query(x1,x...) = NotmuchQueryOperator{:and}(Any[x1,x...])
+or_query(x1::NotmuchLeaf{:from},x2::NotmuchLeaf{:to}) =
+    if x1.value==x2.value
+        NotmuchLeaf{:fromto}(x1.value)
+    else
+        NotmuchQueryOperator{:or}(Any[x1,x...])
+    end
+or_query(x1,x...) = NotmuchQueryOperator{:or}(Any[x1,x...])
+and_query(x1::NotmuchQueryOperator{:and},x...) = NotmuchQueryOperator{:and}(Any[x1.subqueries...,x...])
+or_query(x1::NotmuchQueryOperator{:or},x...) = NotmuchQueryOperator{:or}(Any[x1.subqueries...,x...])
+
+include("tag.jl")
+include("updates.jl")
+include("parsers.jl")
+trash(f) = println("rm $f")
+
+
+
+function attachments(x::AbstractVector)
+    [ a for a in attachments.(x) if a !== nothing ]
+end
+
+function attachments(x::JSON3.Object)
+    if hasproperty(x, :body)
+        vcat(attachments(x.body)...)
+    elseif hasproperty(x, :content)
+        if hasproperty(x, Symbol("content-type")) && x["content-type"] in [ "multipart/alternative", "multipart/mixed" ]
+            vcat(attachments(x.content)...)
+        else
+            nothing
+        end
+    elseif hasproperty(x, Symbol("content-disposition")) && x["content-disposition"] == "attachment"
+        x
+    elseif hasproperty(x, Symbol("content-type")) && x["content-type"] == "text/html"
+        nothing
+    else
+        @warn ("invalid $x")
+        nothing
+    end
+end
+
+function attachments(id::String; kw...)
+    attachments(Notmuch.show(id; body=true, kw...))
+end
+
+function counts(basq, a...; subqueries=String[], kw...)
+    if isempty(subqueries)
+        [ notmuch_count(a..., basq;kw...) ]
+    else
+        [ parse(Int,chomp(Notmuch.notmuch(
+            "count", basq !== nothing ? "($basq) and ($t)" : t;
+            kw...)))
+          for t in subqueries ]
+    end
+end
+
+function tagcounts(query, a...; kw...)
+    ts = Notmuch.notmuch_json("search", "--output=tags", a..., query; kw...)
+    iob = IOBuffer()
+    open(
+        Notmuch.notmuch_cmd(
+            "count", "--batch"; kw...
+                ),
+        "w", iob) do io
+            for t in ts
+                println(io, "($query) and tag:$t")
+            end
+        end
+    result = split(String(take!(iob)),"\n")
+    sort([ (tag=t, count=parse(Int,c))
+          for (t,c) in zip(ts,result) ]; by = x -> x[2])
+end
+
 
 include("user.jl")
 
@@ -59,6 +150,7 @@ function notmuch_cmd(command, x...; log=false, kw...)
     c
 end
 
+export notmuch
 """
     notmuch(x...; kw...)
 
@@ -88,7 +180,7 @@ For user `kw...` see [`userENV`](@ref).
 """
 function notmuch_json(command,x...; kw...) 
     r = notmuch(command, "--format=json", x...; kw...)
-    r === nothing && return nothing
+    r === nothing && return []
     JSON3.read(r)
 end
 
@@ -149,10 +241,7 @@ function notmuch_count(x...; kw...)
     parse(Int,chomp(c))
 end
 
-include("Threads.jl")
 
-ToF = Union{Type,Function}
-LIMIT = 5
 """
     notmuch_search(query, x...; offset=0, limit=LIMIT, kw...)
     notmuch_search(T::Union{Type,Function}, x...; kw...)
@@ -304,32 +393,16 @@ notmuch_search(T::ToF, x...; kw...) =
     T.(notmuch_search(x...; kw...))
 export notmuch_search
 
-function counts(basq, a...; subqueries=String[], kw...)
-    if isempty(subqueries)
-        [ notmuch_count(a..., basq;kw...) ]
+export notmuch_ids
+function notmuch_ids(q; limit = missing, kw...)
+    limit = limit === missing ? Notmuch.notmuch_count(q; kw...) : limit
+    if limit > 0
+            Notmuch.notmuch_search(
+                q, "--limit=$limit", "--output=messages";
+                limit = limit, kw...)
     else
-        [ parse(Int,chomp(Notmuch.notmuch(
-            "count", basq !== nothing ? "($basq) and ($t)" : t;
-            kw...)))
-          for t in subqueries ]
+        []
     end
-end
-
-function tagcounts(query, a...; kw...)
-    ts = Notmuch.notmuch_json("search", "--output=tags", a..., query; kw...)
-    iob = IOBuffer()
-    open(
-        Notmuch.notmuch_cmd(
-            "count", "--batch"; kw...
-                ),
-        "w", iob) do io
-            for t in ts
-                println(io, "($query) and tag:$t")
-            end
-        end
-    result = split(String(take!(iob)),"\n")
-    sort([ (tag=t, count=parse(Int,c))
-          for (t,c) in zip(ts,result) ]; by = x -> x[2])
 end
 
 using Dates
@@ -827,9 +900,6 @@ export notmuch_tree
 
 
 
-using CombinedParsers
-include("tag.jl")
-
 include("mv.jl")
 
 export notmuch_files
@@ -852,7 +922,7 @@ function tag_spam(query="tag:new"; tag="spam", limit= 100, kw...)
       if is_spam(id; kw...)
           @info "spam id:$id"
           println(Email(id; kw...))
-          notmuch_tag(Dict("id:$id" => [MailTagChange(TagChange("+",tag), nothing)]); kw...)
+          notmuch_tag(Dict("id:$id" => [TagChange(TagChange("+",tag), nothing)]); kw...)
       end
   end
 end
@@ -880,13 +950,14 @@ Joins `keywords` to `,` separated list and adds as `X-Keywords` to headers.
 See [`SMTPClient.get_body`](@ref).
 (Note changed keyword argument names.)
 """
-function rfc_mail(; from, to=String[], cc=String[], bcc=String[], subject, content,
+function rfc_mail(; from=missing, to=String[], cc=String[], bcc=String[], subject, content,
                   replyto="",
                   message_id = "",
                   in_reply_to="",
                   references="",
                   date = now(),
                   keywords = String[], kw... )
+    from = from === missing ? primary_email(;kw...) : from
     io = SMTPClient.get_body(
         to, from,
         subject,
@@ -903,6 +974,32 @@ function rfc_mail(; from, to=String[], cc=String[], bcc=String[], subject, conte
     )
     s = String(take!(io))
 end
+function rfc_mail(subject::AbstractString, content::AbstractString="";
+                  from=missing, to=String[], cc=String[], bcc=String[],
+                  replyto="",
+                  message_id = "",
+                  in_reply_to="",
+                  references="",
+                  date = now(),
+                  keywords = String[], kw... )
+    from = from === missing ? primary_email(;kw...) : from
+    io = SMTPClient.get_body(
+        to, from,
+        subject,
+        SMTPClient.Plain(content);
+        cc=cc,
+        bcc=bcc,
+        replyto=replyto,
+        messageid=message_id,
+        inreplyto=in_reply_to,
+        references=references,
+        date=date,
+        keywords=keywords,
+        kw...
+    )
+    s = String(take!(io))
+end
+
 
 # function Notmuch.rfc_mail(; from, to=String[], cc=String[], bcc=String[], subject, content, replyto="", message_id = "", in_reply_to="", references="", date = now(), kw... )
 #     io = SMTPClient.get_body(
@@ -927,11 +1024,13 @@ end
 Insert `mail` as a mail file into `notmuch` (see `notmuch insert`).
 Writes a file and changes tags in xapian.
 """
-function notmuch_insert(mail; tags::AbstractVector{TagChange} = TagChange[TagChange("+new")], folder="elmail", kw...)
+function notmuch_insert(mail; tag = [], folder="Draft", kw...)
+    tc = tag isa AbstractVector ? tag : [tag]
+    @show tgs = ["$p" for p in tc]
     open(
         Notmuch.notmuch_cmd(
             "insert", "--create-folder" ,"--folder=$folder",
-            ["$p" for p in tags]...;
+            tgs...;
             kw...
                 ),
         "w", stdout) do io
@@ -944,99 +1043,6 @@ export notmuch_insert
 include("Show.jl")
 
 include("msmtp.jl")
-
-function maildirs(base, outbase="", result=String[]; kw... )
-    ismaildir(f) = isdir(joinpath(f,"cur")) && isdir(joinpath(f,"new")) && isdir(joinpath(f,"tmp"))
-    env = userENV(; kw...)
-    subfolders = [ f for f in readdir(joinpath(env["HOME"], base))
-                      if isdir(joinpath(env["HOME"], base,f))
-                          ]
-    for f in subfolders
-        if ismaildir(joinpath(env["HOME"], base,f))
-            push!(result, joinpath(outbase,f))
-        else
-            maildirs(joinpath(base,f), joinpath(outbase,f), result; kw... )
-        end
-    end
-    result
-end
-
-export notmuch_config
-function notmuch_config(; kw... )
-    env = userENV(; kw...)
-    cfg_file = joinpath(env["HOME"], ".notmuch-config")
-    result = tryparse(parse_notmuch_cfg(),read(cfg_file, String); trace=true, log=true)
-    if result isa Dict
-        result[:folders]= maildirs(result[:database][:path]; kw...)
-        result
-    end
-end
-
-function splitter(key; delim=";")
-    NamedParser(Symbol(key),Sequence(
-        key, re" *= *",
-        join(!Regcomb("[^$delim\n]+"),delim), "\n") do v
-                (key = Symbol(key), value = strip.(v[3]))
-                end
-                )
-end
-
-export parse_notmuch_config
-function parse_notmuch_cfg()
-    parse_cfg(
-        splitter("tags"),
-        splitter("exclude_tags"),
-        splitter("primary_email"),
-        splitter("other_email")
-    )
-end
-
-export parse_notmuch_config
-function parse_cfg(keyvalues...)
-    line = !Atomic(Sequence(1, !re"[^\n]+"))
-    @with_names section = Atomic(Sequence(2,"[", !re"[^]]+", "]", whitespace))
-    @with_names comment = Atomic(Sequence(2,re"#+ *", !re"[^\n]*"))
-    whitespace_newline = !re" *\n"
-    setting =
-        Either(
-            keyvalues...,
-            Sequence(:key => !Atomic(re"[a-zA-Z0-9_]+"), re" *= *", :value => Atomic(line)),
-            Either(
-                comment,
-                whitespace_newline) do v
-                    nothing
-                end
-        )
-    #
-    ignored = Either(
-        comment,
-        whitespace_newline) do v
-            nothing
-        end
-    Repeat(Either(
-        Sequence(
-            section,
-            Repeat(Either(ignored,setting))) do v
-                sect,set = v
-                Symbol(sect) => Dict(
-                    [ (Symbol(k.key) => k.value)
-                      for k in set
-                          if k !== nothing ]...
-                              )
-            end,
-        ignored
-    )) do v
-        Dict{Symbol,Any}(filter(x -> x!==nothing, v)...)
-    end
-end
-
-function offlineimap_config(;kw... )
-    env = userENV(; kw...)
-    cfg_file = joinpath(env["HOME"], ".offlineimaprc")
-    prsr = (parse_cfg(
-        splitter("accounts";delim=",")))
-    parse(prsr,read(cfg_file, String))
-end
 
 function replies(id)
     notmuch_search
@@ -1052,5 +1058,186 @@ function summary(q,a...; kw...)
      , tags = tagcounts(q,a...; kw...)
      )
 end
+
+function print_summary(io::IO,q,a...; kw...)
+    s = summary(q,a...; kw...)
+
+    frm = DataFrame(s.from)
+    println(io,"From:")
+    sort!(frm,:count)
+    println(filter(r->r.count>1,select(frm, [:address, :count])))
+    println(join(filter(r->r.count==1,select(frm, [:address, :count])).address, ", "))
+
+
+    to = DataFrame(s.to)
+    println(io,"To:")
+    sort!(to,:count)
+    println(filter(r->r.count>1,select(to, [:address, :count])))
+    println(join(filter(r->r.count==1,select(to, [:address, :count])).address, ", "))
+
+    tags = DataFrame(s.tags)
+    println(io,"tags:")
+    sort!(tags,:count)
+    println(tags)
+
+    for a in sort(s.to; by=e->e.count)
+    end
+end
+
+include("setup.jl")
+
+function print_rules()
+    my_mails = [ e.from  for e in msmtp_config()]
+    from_me = join([ "from:$x" for x in my_mails], " or ")
+    blacklist = "(tag:spam or tag:advertisement)"
+    nc = notmuch_count("tag:new and not $blacklist")
+    uc = notmuch_count("tag:unread and not $blacklist")
+    print("Notmuch.jl ")
+    printstyled(nc," new",color=:green)
+    print(" and ")
+    printstyled(uc," unread",color=:light_blue)
+    println(" mail.")
+    trules = tagrules("from:elmail_api_tag")
+    trulesdf = [
+        tc => DataFrame([(query= try
+                              notmuch_query_parser(q;trace=true)
+                          catch err
+                              println(q)
+                              println(h)
+                              q
+                          end
+                          , count = sum([event.count for event in h])
+                          , events = length(h)
+                          , history=h
+                                  )
+                         for (q,h) in v
+                             ])
+                for (tc,v) in trules
+                    ]
+    function print_selected_rules(filt=r -> r.query isa Union{Notmuch.NotmuchLeaf{:fromto},Notmuch.NotmuchLeaf{:from}})
+        senders = [let seldf = filter(filt, df)
+                       seldf[!, :query] = [ x.value for x in seldf.query]
+                       sort!(seldf, [:count]; rev=true)
+                       tc => seldf
+                   end 
+                   for (tc, df)  in (trulesdf)]
+        
+        for (tc, senderdf) in sort(senders, by=first)
+            if !isempty(senderdf)
+                println(tc)
+                show(stdout,senderdf; row_labels=nothing, eltypes=false, allrows=true,summary=false)
+                println()
+                ## pretty_table(senderdf)
+            end
+        end
+    end
+    println("\n\n## Sender Rules")
+    print_selected_rules(r -> r.query isa Union{Notmuch.NotmuchLeaf{:fromto},Notmuch.NotmuchLeaf{:from}})
+    
+    println("\n\n## Tag Rules")
+    print_selected_rules(r -> r.query isa Union{Notmuch.NotmuchLeaf{:tag}})
+    ids = [let seldf = filter(r -> r.query isa Union{Notmuch.NotmuchLeaf{:id}}, df)
+               seldf[!, :query] = [ (x.value) for x in seldf.query]
+               email = [ Email(x; body=false) for x in seldf.query]
+               seldf[!, :from] = [ x === nothing ? nothing : parse(email_parser,x.headers.From;trace=true) for x in email]
+               seldf[!, :count] = [ x === nothing ? 0 : notmuch_count("to:$x and ($from_me)") for x in seldf.from]
+               seldf[!, :count_from] = [ x === nothing ? 0 : notmuch_count("from:$x") for x in seldf.from]
+               ##seldf[!, :count_from_sub] = [ x === nothing ? 0 : notmuch_count("from:$x and subject:\"$(e.headers.Subject)\"") for (e,x) in zip(email,seldf.from)]
+               seldf[!, :subject] = [ x === nothing ? nothing : x.headers.Subject for x in email]
+               for (r, e) in zip(eachrow(seldf), email)
+                   if e !== nothing
+                       if tc == TagChange("+spam")
+                           if ((r.count>0 && r.count_from>0 && r.from != "info@g-kappler.de" ) ||
+                               r.from in ["russia@hotelsrussia.com","station@station.sony.com", "noreply@steampowered.com"])
+                               println("false positive ",tc, " ",r.from, " ", e)
+                               notmuch_tag("id:$(e.id)" => "-spam")
+                           elseif (r.count==0 && r.count_from==1)
+                               println("true obsolete positive ",tc, " ",r.from, "\n", e)
+                               notmuch_tag("id:$(e.id)" => "-spamaybe")
+                           end
+
+                           
+                       end
+                   end
+                   for h in r.history
+                       for fn in h.filename
+                           trash(fn)
+                       end
+                   end
+               end
+               sort!(seldf, [:count, :count_from]; rev=true)
+               tc => seldf
+           end 
+           for (tc, df)  in (trulesdf)]
+    
+    for (tc, senderdf) in sort(ids, by=first)
+        if !isempty(senderdf)
+            println(tc)
+            show(stdout,senderdf; row_labels=nothing, eltypes=false, allrows=true,summary=false)
+            println()
+            ## pretty_table(senderdf)
+        end
+    end
+end
+
+# Function to be called when the module is loaded
+function __init__()
+
+    
+    # sm = summary("tag:inbox and not $blacklist")
+    # f = DataFrame(sm.from)
+    # sort!(f,:count)
+    # println(f)
+    
+    # t = DataFrame(sm.to)
+    # sort!(t,:count)
+    # println(t)
+    
+    # println("users:", join(usernames(),", "))
+    # println("\nconfigured smtp mail adresses:\n  ",
+    #         join(my_mails,"\n  "))
+    # offlimapcfg = offlineimap_config()
+    # println("\nConfigured offlineimap accounts:")
+    # #println(offlimapcfg)
+    # println(DataFrame([
+    #     try
+    #         lcl = offlimapcfg[Symbol("Account $e")][:localrepository]
+    #         rmt = offlimapcfg[Symbol("Account $e")][:remoterepository]
+    #         lclr = offlimapcfg[Symbol("Repository $lcl")]
+    #         rmtr = offlimapcfg[Symbol("Repository $rmt")]
+            
+    #         (name = e,
+    #          folder = lclr[:localfolders],
+    #          user = rmtr[:remoteuser],
+    #          host = rmtr[:remotehost]                    )
+    #     catch err
+    #         printstyled("offlineimap $e not set up correctly $err";color=:red)
+    #         (name = e,
+    #          folder = "?",
+    #          user = "?",
+    #          host = "$e"                    )
+    #     end
+    #     for e in offlimapcfg[:general][:accounts]
+
+    #         ]))
+end
+
+"""
+    Key = Union{AbstractString,Symbol} 
+
+Genie GET and POST key type.
+"""
+Key = Union{AbstractString,Symbol}
+
+function main()
+  Core.eval(Main, :(const UserApp = $(@__MODULE__)))
+
+  Genie.genie(; context = @__MODULE__)
+
+  Core.eval(Main, :(const Genie = UserApp.Genie))
+  Core.eval(Main, :(using Genie))
+end
+
+include("genie.jl")
 
 end

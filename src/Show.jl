@@ -143,29 +143,46 @@ show(id::AbstractString; body=false, kw...) =
 
 
 function Base.show(io::IO, x::Email)
-    if get(io, :compact, true)
+    if get(io, :compact, false)
         showline(io,x)
     else
         #ae = tryparse(author_email,x.headers.From)
         printstyled(io, x.date_relative, " ")
-        printstyled(io, x.headers.From; color=:yellow)
+        print(io, email_parser(x.headers.From))
+        println(io)
+        printstyled(io, x.headers.Subject; bold=true)
         for t in x.tags
             printtag(io,t)
         end
-        println(io)
-        printstyled(io, x.headers.Subject; bold=true)
         for c in x.body
             print(io, "\n", c)
         end
     end
 end
 
+function Base.show(io::IO, ::MIME"text/html", x::Email)
+        #ae = tryparse(author_email,x.headers.From)
+        println(io, "<div><span class=\"date\">", x.date_relative, "</span>")
+        println(io, "<span class=\"from\">", x.headers.From, "</span>")
+        for t in x.tags
+            println(io, "<span class=\"tag\">", t, "</span>")
+        end
+        println(io,"</div")
+        println(io, "<div class=\"\">")
+        println(io, "<span class=\"subject\">", x.headers.Subject, "</span>")
+        for c in x.body
+            print(io, "\n", c)
+        end
+        println(io,"</div")
+end
+
+
 showline(x::Email) =
     showline(stdout,x)
 
 function showline(io::IO, x::Email)
     printstyled(io, x.timestamp, " ")
-    printstyled(io, x.headers.From; color=:yellow)
+    print(io, email_parser(x.headers.From))
     print(io,": ")
     printstyled(io, x.headers.Subject, " "; bold=true)
     for t in x.tags
@@ -242,37 +259,6 @@ function flatten!(r::Vector, x::Email)
     r
 end
 
-struct Mailbox
-    user::String
-    domain::String
-end
-function Base.show(io::IO, x::Mailbox)
-    printstyled(io, x.user; color = :yellow)
-    printstyled(io, "@", x.domain; color = :light_yellow)
-end
-## is this official??
-
-using CombinedParsers
-alpha = CharIn('a':'z','A':'Z')
-alphanum = CharIn('a':'z','A':'Z','0':'9')
-extrachar = CharIn("-+_.~")
-email_regexp = Sequence(
-    !(CharIn(extrachar,alpha)*Repeat(CharIn(extrachar,alphanum))),
-    "@",!Repeat1(CharIn(CharIn("-."),alphanum))) do v
-        Mailbox(v[1], v[3])
-    end
-
-author_email = Either(
-    Sequence(
-        :name => !Repeat(CharNotIn('<')),
-        CombinedParsers.horizontal_space_maybe,"<",
-        :email => email_regexp,
-        ">"),
-    map(email_regexp) do v
-        (name = "",
-         email =v)
-    end
-)
 
 using AbstractTrees
 Base.show(io::IO, x::WithReplies) = print_tree(io,x)

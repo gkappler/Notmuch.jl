@@ -138,39 +138,3 @@ function Base.show(io::IO, x::SMTPConfig)
     end
 end
 
-using CombinedParsers.Regexp
-word = !re"[^\v\h]+"
-whitespace = re"[\v\h]+"
-
-msmtp_setting(x) =
-    Sequence(3, x, whitespace, word, whitespace) do v
-        Symbol(x) => v
-    end
-
-export parse_msmtp_cfg
-
-parse_msmtp_cfg() =
-    Sequence(
-        msmtp_setting("account"),
-        Repeat(
-            Either(
-                msmtp_setting.([
-                    "host",
-                    "from",
-                    "domain", # ?
-                    "port",
-                    "tls",
-                    "tls_starttls",
-                    "tls_certcheck",
-                    "tls_trust_file",
-                    "auth", 
-                    "user",
-                    "password",
-                    "logfile",
-                    "#"
-                ]
-                               )))
-    ) do v
-        SMTPConfig(v[1].second; v[2]...)
-    end
-
