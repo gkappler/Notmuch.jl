@@ -20,6 +20,13 @@ headerfield(::Val, x) = x
 
 headerfield(::Val, x::Nothing) = ""
 
+function StyledStrings.annotatedstring(x::Headers) 
+    styled"{date:$(x.Date)}\n$(x.Subject)\nFrom: {from:$(x.From)}"  *
+        (isempty(x.To) ? "" : styled"\nTo: {To:$(x.To)}") *
+        (isempty(x.Cc) ? "" : styled"\nCc: {Cc:$(x.Cc)}") *
+         "\n"
+end
+Base.show(io::IO,x::Headers) = print(io,annotatedstring(x))
     
 function Headers(x)
     Headers((headerfield(Val{k}(), get(x,replace("$k", '_' => '-'), nothing))

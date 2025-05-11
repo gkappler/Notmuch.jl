@@ -146,6 +146,6 @@ ignore=/.*[.](json|lock|bak)|[.]git\$/
 synchronize_flags=true
 
         """)
-        notmuch_new()
+        #notmuch()
     end
 end

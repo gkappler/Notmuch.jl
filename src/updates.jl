@@ -1,38 +1,47 @@
 export TagChange, FolderChange
 
-export @rule_str
-macro rule_str(x)
-    quote
-        MailsRule($x)
-    end
+@auto_hash_equals struct Agent{name}
+    from_folder::String
+    to_folder::String
 end
 
-struct MailsRule{C}
+@auto_hash_equals struct FolderChange
+    from_folder::String
+    to_folder::String
+end
+function Base.show(io::IO, x::FolderChange)
+    print(io, styled"mv {yellow:$(x.from_folder)} {green:$(x.to_folder)}")
+end
+query(x::FolderChange) =
+    NotmuchLeaf{:folder}(x.from_folder)
+
+export @rule_str
+macro rule_str(x)
+    #esc(quote
+        MailsRule(x)
+    #end)
+end
+
+export MailsRule
+@auto_hash_equals struct MailsRule{C}
     change::C
     count::Union{Int, Missing}
     query::Query
-    mailid::Union{String, Missing}
+    #mailid::Union{String, Missing}
     MailsRule(change, query) =
-        new{typeof(change)}(change, missing, query, missing)
-    MailsRule(change, count::Int, query) =
-        new{typeof(change)}(change, count, query, missing)
-    MailsRule(change, query, mailid) =
-        new{typeof(change)}(change, missing, query, mailid)
+        new{typeof(change)}(change, missing, query)
+    MailsRule(change, count::Union{Int,Missing}, query) =
+        new{typeof(change)}(change, count, query)
 end
+
 MailsRule(rule::AbstractString) =
     rule_parser(rule)
+
 query(x::MailsRule) =
     and_query(query(x.change), x.query)
-
+Base.convert(::Type{Query}, x::String) = query_parser(x)
 function Base.show(io::IO, x::MailsRule)
     print(io, x.change, " ", x.count, " ", x.query)
-end
-
-export apply_rule
-function apply_rule(x::MailsRule{<:AbstractVector}; kw...)
-    for c in x.change
-        apply_rule(MailsRule(c,x.query,x.mailid); kw...)
-    end
 end
 function maildir_names(f, mdir=missing; kw...)
     mdir = mdir === missing ? maildir(;kw...) : mdir
@@ -47,14 +56,75 @@ function maildir_names(f, mdir=missing; kw...)
         filename = basename(f)
      )
 end
-function apply_rule(x::MailsRule{FolderChange}; kw...)
+
+
+function ynp(x)
+    println(x,"?")
+    if readline(stdin) in ["y", "yes"]
+        true
+    else
+        false
+    end
+end
+
+export apply_rule
+apply_rule(r; kw...) = apply_rule(r, "$r"; kw...)
+
+function apply_rule(x::MailsRule{FolderChange}, in_reply_to; do_mkdir_prompt::Function=msg -> begin
+                        @info msg
+                        true
+                    end, kw...)
     function perform_mv(f, target_folder; revertio)
         fname=basename(f)
         dname=dirname(f)
         target_file = if isdir(target_folder)
             joinpath(target_folder,fname)
-        else
+        elseif isfile(target_folder)
             target_folder
+        else ## does not exist!
+            root = dirname(target_folder)
+            sub = basename(target_folder)
+            if do_mkdir_prompt("Make path $root and ensure Maildir structure")
+                # Standard Maildir subdirectories
+                maildir_subs = ["cur", "new", "tmp"]
+
+                if sub in maildir_subs
+                    # Assume 'folder' is like /path/to/maildir/.Archive/cur
+                    # We need to ensure /path/to/maildir/.Archive/cur, new, tmp exist
+                    # The parent directory of 'folder' is the Maildir folder itself (e.g., .Archive)
+                    maildir_root = root
+                    try
+                        # Create all standard subdirectories within the parent
+                        for s in maildir_subs
+                            mkpath(joinpath(maildir_root, s))
+                        end
+                        @info "Created Maildir structure at $maildir_root"
+                        # After creation, check if the specific target sub-directory exists
+                        if !isdir(target_folder)
+                            # This should ideally not happen if mkpath succeeded
+                            error("Failed to create target directory '$target_folder' even after mkpath.")
+                        end
+                        #return true # Directory created/ensured
+                    catch e
+                        @error "Failed to create directory structure for $target_folder" exception=(e, catch_backtrace())
+                        return false # Failed to create
+                    end
+                else
+                    # If the target's basename isn't cur, new, or tmp, the original code errored.
+                    # Maintain this behavior.
+                    error("Target folder '$target_folder' does not end in 'cur', 'new', or 'tmp'. Not a standard Maildir target according to original logic.")
+                    # If general directory creation were desired:
+                    # try
+                    #     mkpath(folder)
+                    #     @info "Created directory $folder"
+                    #     return true
+                    # catch e
+                    #     @error "Failed to create directory $folder" exception=(e, catch_backtrace())
+                    #     return false
+                    # end
+                end
+            end
+            joinpath(target_folder,fname)
         end
         mv(f,target_file)
         println(revertio,"mv $target_file $dname")
@@ -88,13 +158,13 @@ function apply_rule(x::MailsRule{FolderChange}; kw...)
         mv_summary = "Moved\n" * join(["$N mail files $from_folder => $target_folder"
                                                                     for ((from_folder, target_folder), N) in pairs(files)],
                                                                    "\n") *"\n within maildir $mdir\n\n\n\nMails:\n"
-        
+        @info mv_summary
         ##notmuch_tag(x.query => x.change; kw...)
         rfc = rfc_mail(
             from = "mvrule@notmuch.jl",
             #to = to, 
             subject = "$(x.change) $(length(ids)) $(x.query)", 
-            in_reply_to = x.mailid,
+            in_reply_to = in_reply_to,
             content = 
                 MultiPart(
                     :mixed,
@@ -106,21 +176,30 @@ function apply_rule(x::MailsRule{FolderChange}; kw...)
                     )
                 )
         )
-        println(rfc)
+        ##println(rfc)
         notmuch_insert(
             rfc;
             folder = "notmuch_rule/mv",
-            tags = tag"+rule/mv",
+            tag = tag"+rule/mv",
             kw...
                 )
-        notmuch_new()
+        notmuch(:new; kw...)
+        ids
     else
+        []
     end
 end
 
-function apply_rule(x::MailsRule{TagChange}; kw...)
+## Todo: in practice this should at
+apply_rule(x::MailsRule{<:AbstractVector}, a...; kw...) =
+   vcat( [ apply_rule(MailsRule(tc,x.count,x.query), a...; kw...)
+      for tc in x.change ]...)
+    
+
+
+function apply_rule(x::MailsRule{TagChange}, in_reply_to; kw...)
     q = query(x)
-    @show affected = notmuch_count(q; kw...)
+    affected = notmuch_count(q; kw...)
     if affected > 0
         ids = notmuch_ids(q; kw...)
         notmuch_tag(x.query => x.change; kw...)
@@ -128,7 +207,7 @@ function apply_rule(x::MailsRule{TagChange}; kw...)
             from = "tagrule@notmuch.jl",
             #to = to, 
             subject = "$(x.change) tag $(length(ids)) $(x.query)", 
-            in_reply_to = x.mailid,
+            in_reply_to = in_reply_to,
             content = 
                 MultiPart(
                     :mixed,
@@ -147,91 +226,88 @@ function apply_rule(x::MailsRule{TagChange}; kw...)
         notmuch_insert(
             rfc;
             folder = "notmuch_rule/tag",
-            tags = tag"+rule/tag",
+            tag = tag"+rule/tag",
             kw...
         )
+        ids
     else
+        []
     end
 end
 
 
-function log_changes(change::TagChange, ids)
+function apply_rule(x::MailsRule{<:Function}, in_reply_to; kw...)
+    q = x.query
+    affected = notmuch_count(q; kw...)
+    if affected > 0
+        ids = notmuch_ids(q; kw...)
+        rfc = x.change(ids)
+        ids
+    else
+        []
+    end
 end
 
-# struct MailTagChange
-#     rule::TagChange
-#     mailid::Union{String, Nothing}
+
+# function tag_new(q="from:targrule@notmuch.jl"; user=nothing, pars...)
+#     rule_history(q; pars...)
+#     for r in rule_history(q; pars...)
+#         tagrule = r.first
+#         queries = r.second
+#         for (query, history) in pairs(queries)
+#             if length(history)>1
+#                 println("archiving history ($(length(history)))")
+#                 for h in history[2:end]
+#                     notmuch_tag("id:" * h.id => "-autotag")
+#                 end
+#             end
+#             push!(get!(tcs, query) do
+#                       TagChange[]
+#                   end,
+#                   MailTagChange(tagrule, history[1].id)
+#                   )
+#         end
+#     end
+#     R = notmuch_tag(tcs; user = user, body = "")
 # end
 
-# Base.show(io::IO, x::MailTagChange) =
-#     print(io,x.rule)
 
-# @with_kw struct LogMail
-#     folder::String
-#     tags::Vector{TagChange}
-#     rfc_mail::String
-# end
-
-# Base.convert(::Type{TagChange}, x::MailTagChange) =
-#     x.rule
-
-
-
-
-
-struct FolderChange
-    from_folder::String
-    to_folder::String
-end
-function Base.show(io::IO, x::FolderChange)
-    print(io, styled"mv {yellow:$(x.from_folder)} {green:$(x.to_folder)}")
-end
-
-query(x::FolderChange) =
-    NotmuchLeaf{:folder}(x.from_folder)
-
-
-
-
-
-function tag_new(q="tag:autotag"; user=nothing, pars...)
-    tcs = Dict{String, Vector{TagChange}}()
-    for r in tagrules(q; pars..., user = user)
-        tagrule = r.first
-        queries = r.second
+function apply_rules(q="from:notmuch.jl"; pars...)
+    local rh = rule_history(q; pars...)
+    local count = 0
+    for (rule, queries) in rh
+        local rule_count = 0
         for (query, history) in pairs(queries)
-            if length(history)>1
-                println("archiving history ($(length(history)))")
-                for h in history[2:end]
-                    notmuch_tag("id:" * h.id => "-autotag")
-                end
-            end
-            push!(get!(tcs, query) do
-                      TagChange[]
-                  end,
-                  MailTagChange(tagrule, history[1].id)
-                  )
+            local N, email = history[1]
+            local current_run = @show apply_rule(MailsRule(rule,N,query), email.id; pars...)
+            empty!(history)
+            pushfirst!(history, length(current_run) => nothing)
+            rule_count += length(current_run)
         end
+        count += length(rule_count)
     end
-    R = notmuch_tag(tcs; user = user, body = "")
-    [ r for r in Notmuch.rule_history(q, tag_rule_parser;
-                                     pars..., user = user) ]
+    rh
 end
 
 
-function tagrules(q="tag:autotag", rule_parser=tag_rule_parser; remove_errors=true, kw...)
-    history = rule_history(q, rule_parser; kw...)
+function rule_history(q="from:notmuch.jl"; remove_errors=true, kw...)
+    history = [ Email(x) => MailsRule(x.headers.Subject)
+      for x in flatten(
+           notmuch_show(q
+                       ; body = false
+                       , kw...))
+          ] #rule_history(q; kw...)
     tcs = Dict()
-    for r in history
-        if r.rule.count > 0
+    for (email, r) in history
+        if r.count > 0
             rd = get!(
-                get!(tcs, r.rule.change) do
+                get!(tcs, r.change) do
                     Dict()
                 end,
-                r.rule.query) do
+                r.query) do
                     []
                 end
-            push!(rd, (date = r.date, count = r.rule.count, id = r.id, filename=r.filename) )
+            push!(rd, r.count => email )
         else
             @warn "unknown email" r
             for f in r.filename
@@ -246,20 +322,9 @@ function tagrules(q="tag:autotag", rule_parser=tag_rule_parser; remove_errors=tr
     tcs
 end
 
-function rule_history(q="tag:autotag", rule_parser=tag_rule_parser;
-                     limit = 1000, kw...)
-    [ (;rule = rule_parser(x.headers.Subject),
-       date = unix2datetime(x.timestamp),
-       id=x.id,
-       filename = x.filename,
-       tags = x.tags)
-      for x in flatten(
-          notmuch_show(q
-                       ; limit=limit
-                       , body = false
-                       , kw...))
-          ]
-end
+
+
+
 
 """
     notmuch_tag(batch::Pair{<:AbstractString,<:AbstractString}...; kw...)
@@ -271,90 +336,89 @@ Spaces in tags are supported, but other query string encodings for [`notmuch tag
 
 For user `kw...` see [`userENV`](@ref).
 """
-function log_notmuch_tag(batch::Dict{<:AbstractString,<:AbstractVector{TagChange}};
-                     user = nothing,
-                     dryrun = false,
-                     from= userEmail(user), to = String["elmail_api_tag@g-kappler.de"],
-                     body = nothing,
-                     kw...)
-    1
-    freshtags = Any[]
-    for (qq,tagchanges) in batch
-        for tc in tagchanges
-            q = "("*qq*") and (" * (tc.rule.prefix == "+" ? " not tag:" * tc.rule.tag : " tag:" * tc.rule.tag )  * ")"
-            ids = notmuch_ids(q; user = user, kw...)
-            log_mail = if body === nothing
-                ids -> nothing
-            else 
-                ids -> if length(ids)==1
-                    (folder = "elmail/tag", tags = [ TagChange("+tag") ], 
-                     rfc_mail = rfc_mail(from = from, to = to, 
-                                         in_reply_to = "<" * ids[1] * ">",
-                                         subject = "$tc tag", content= SMTPClient.Plain(body)))
-                else
-                    (folder = "elmail/autotag", tags = [ TagChange("+autotag") ],
-                     rfc_mail = rfc_mail(
-                         from = from, to = to, 
-                         subject = "$tc tag $(length(ids)) $qq", 
-                         in_reply_to = if tc.mailid === nothing
-                             ""
-                         else
-                             "<$(tc.mailid)>"
-                         end,
-                         content = 
-                             MultiPart(
-                                 :mixed,
-                                 SMTPClient.Plain(body),
-                                 SMTPClient.MIMEContent(
-                                     "notmuch.ids",
-                                     ## 
-                                     join([tc.rule.prefix *
-                                         replace(
-                                             tc.rule.tag,
-                                             " " => "%20") *
-                                                 " -- id:" * id
-                                           for id in ids ]
-                                          ,"\n")
-                                 )
-                             )
-                     ))
-                end
-            end
-            insert = log_mail(ids)
-            #println(rfc)
-            !isempty(ids) && if insert !== nothing
-                @info "tag $(length(ids)) $q => $tc, log ids"
-                notmuch_insert(insert.rfc_mail
-                               ; tags = [ insert.tags..., TagChange("-inbox"), TagChange("-new") ]
-                               , folder= insert.folder
-                               , user = user, kw...
-                                   )
-            else
-                @info "tag $(length(ids)) $q => $tc"
-            end
-            push!(freshtags,(rule = qq => tc, count = length(ids)))
-        end
-    end
-    
-    ##cd(@show paths.home)
-    dryrun || open(
-        Notmuch.notmuch_cmd(
-            "tag", "--batch"; user = user, kw...
-        ),
-        "w", stdout) do io
-            for (q, tagchanges) in batch
-                # @info "tag $q" tagchanges
-                # println(tc.rule.prefix,
-                #         replace(tc.rule.tag, " " => "%20")
-                #         , " -- ", q)
-                for tc in tagchanges
-                    println(io, tc.rule.prefix,
-                            replace(tc.rule.tag, " " => "%20")
-                            , " -- ", q)
-                end
-            end
-            # close(io)
-        end
-    freshtags
-    ##noENV!()
-end
+# function log_notmuch_tag(batch::Dict{<:AbstractString,<:AbstractVector{TagChange}};
+#                      user = nothing,
+#                      dryrun = false,
+#                      from= userEmail(user), to = String["elmail_api_tag@g-kappler.de"],
+#                      body = nothing,
+#                      kw...)
+#     1
+#     freshtags = Any[]
+#     for (qq,tagchanges) in batch
+#         for tc in tagchanges
+#             q = "("*qq*") and (" * (tc.rule.prefix == "+" ? " not tag:" * tc.rule.tag : " tag:" * tc.rule.tag )  * ")"
+#             ids = notmuch_ids(q; user = user, kw...)
+#             log_mail = if body === nothing
+#                 ids -> nothing
+#             else 
+#                 ids -> if length(ids)==1
+#                     (folder = "elmail/tag", tags = [ TagChange("+tag") ], 
+#                      rfc_mail = rfc_mail(from = from, to = to, 
+#                                          in_reply_to = "<" * ids[1] * ">",
+#                                          subject = "$tc tag", content= SMTPClient.Plain(body)))
+#                 else
+#                     (folder = "elmail/autotag", tags = [ TagChange("+autotag") ],
+#                      rfc_mail = rfc_mail(
+#                          from = from, to = to, 
+#                          subject = "$tc tag $(length(ids)) $qq", 
+#                          in_reply_to = if in_reply_to === nothing
+#                              ""
+#                          else
+#                              "<$(tc.mailid)>"
+#                          end,
+#                          content = 
+#                              MultiPart(
+#                                  :mixed,
+#                                  SMTPClient.Plain(body),
+#                                  SMTPClient.MIMEContent(
+#                                      "notmuch.ids",
+#                                      ## 
+#                                      join([tc.rule.prefix *
+#                                          replace(
+#                                              tc.rule.tag,
+#                                              " " => "%20") *
+#                                                  " -- id:" * id
+#                                            for id in ids ]
+#                                           ,"\n")
+#                                  )
+#                              )
+#                      ))
+#                 end
+#             end
+#             insert = log_mail(ids)
+#             #println(rfc)
+#             !isempty(ids) && if insert !== nothing
+#                 @info "tag $(length(ids)) $q => $tc, log ids"
+#                 notmuch_insert(insert.rfc_mail
+#                                ; tags = [ insert.tags..., TagChange("-inbox"), TagChange("-new") ]
+#                                , folder= insert.folder
+#                                , user = user, kw...
+#                                    )
+#             else
+#                 @info "tag $(length(ids)) $q => $tc"
+#             end
+#             push!(freshtags,(rule = qq => tc, count = length(ids)))
+#         end
+#     end
+#     ##cd(@show paths.home)
+#     dryrun || open(
+#         Notmuch.notmuch_cmd(
+#             "tag", "--batch"; user = user, kw...
+#         ),
+#         "w", stdout) do io
+#             for (q, tagchanges) in batch
+#                 # @info "tag $q" tagchanges
+#                 # println(tc.rule.prefix,
+#                 #         replace(tc.rule.tag, " " => "%20")
+#                 #         , " -- ", q)
+#                 for tc in tagchanges
+#                     println(io, tc.rule.prefix,
+#                             replace(tc.rule.tag, " " => "%20")
+#                             , " -- ", q)
+#                 end
+#             end
+#             # close(io)
+#         end
+#     freshtags
+#     ##noENV!()
+# end

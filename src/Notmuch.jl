@@ -19,6 +19,7 @@ using PrettyTables
 using JSON3
 
 using Logging, LoggingExtras
+using AutoHashEquals
 
 include("Threads.jl")
 
@@ -26,43 +27,7 @@ ToF = Union{Type,Function}
 LIMIT = 5
 
 
-
-struct NotmuchQueryOperator{op}
-    subqueries::Vector{Any}
-end
-struct NotmuchLeaf{op}
-    value::Any
-end
-
-function StyledStrings.annotatedstring(x::NotmuchLeaf{:not})
-    styled"{bright_red:not} {bright_red:$(x.value)}"
-end
-
-function StyledStrings.annotatedstring(x::NotmuchLeaf{op}) where op
-    colors = Dict(:tag => :light_blue, :from => :yellow, :fromto => :yellow, :to => :green)
-    styled"{$(get(colors,op,:white)):$op}:{$(get(colors,op,:white)):$(x.value)}"
-end
-function StyledStrings.annotatedstring(x::NotmuchQueryOperator{op}) where op
-    join(annotatedstring.(x.subqueries), " $op ")
-end
-
-Base.show(io::IO,x::Union{NotmuchQueryOperator, NotmuchLeaf}) =
-    print(io, annotatedstring(x))
-
-Query = Union{NotmuchQueryOperator,NotmuchLeaf}
-and_query(x) = x
-or_query(x) = x
-and_query(x1,x...) = NotmuchQueryOperator{:and}(Any[x1,x...])
-or_query(x1::NotmuchLeaf{:from},x2::NotmuchLeaf{:to}) =
-    if x1.value==x2.value
-        NotmuchLeaf{:fromto}(x1.value)
-    else
-        NotmuchQueryOperator{:or}(Any[x1,x...])
-    end
-or_query(x1,x...) = NotmuchQueryOperator{:or}(Any[x1,x...])
-and_query(x1::NotmuchQueryOperator{:and},x...) = NotmuchQueryOperator{:and}(Any[x1.subqueries...,x...])
-or_query(x1::NotmuchQueryOperator{:or},x...) = NotmuchQueryOperator{:or}(Any[x1.subqueries...,x...])
-
+include("query.jl")
 include("tag.jl")
 include("updates.jl")
 include("parsers.jl")
@@ -70,22 +35,19 @@ trash(f) = println("rm $f")
 
 
 
-function attachments(x::AbstractVector)
-    [ a for a in attachments.(x) if a !== nothing ]
+function attachments(id, x::AbstractVector)
+    [ attachments(id,a) for a in x if a !== nothing ]
 end
 
-function attachments(x::JSON3.Object)
+function attachments(id, x::JSON3.Object)
     if hasproperty(x, :body)
-        vcat(attachments(x.body)...)
-    elseif hasproperty(x, :content)
-        if hasproperty(x, Symbol("content-type")) && x["content-type"] in [ "multipart/alternative", "multipart/mixed" ]
-            vcat(attachments(x.content)...)
-        else
-            nothing
-        end
+        vcat(attachments(id, x.body)...)
+    elseif hasproperty(x, :content) && hasproperty(x, Symbol("content-type")) && x["content-type"] in [ "multipart/alternative", "multipart/mixed" ]
+            vcat(attachments(id, x.content)...)
     elseif hasproperty(x, Symbol("content-disposition")) && x["content-disposition"] == "attachment"
-        x
-    elseif hasproperty(x, Symbol("content-type")) && x["content-type"] == "text/html"
+        (;:message_id => id, (Symbol(replace("$k", "-" =>"_")) => v for (k,v) in  pairs(x))...)
+    elseif hasproperty(x, Symbol("content-type")) && x["content-type"] in ["text/html","text/plain"]
+        @warn ("dropping $x")
         nothing
     else
         @warn ("invalid $x")
@@ -94,7 +56,7 @@ function attachments(x::JSON3.Object)
 end
 
 function attachments(id::String; kw...)
-    attachments(Notmuch.show(id; body=true, kw...))
+    attachments(id, Notmuch.show(id; body=true, kw...))
 end
 
 function counts(basq, a...; subqueries=String[], kw...)
@@ -107,6 +69,12 @@ function counts(basq, a...; subqueries=String[], kw...)
           for t in subqueries ]
     end
 end
+
+function search_tags(query, a...; kw...)
+    Notmuch.notmuch_json("search", "--output=tags", a..., query; kw...)
+end
+
+
 
 function tagcounts(query, a...; kw...)
     ts = Notmuch.notmuch_json("search", "--output=tags", a..., query; kw...)
@@ -124,6 +92,8 @@ function tagcounts(query, a...; kw...)
     sort([ (tag=t, count=parse(Int,c))
           for (t,c) in zip(ts,result) ]; by = x -> x[2])
 end
+
+
 
 
 include("user.jl")
@@ -403,14 +373,6 @@ function notmuch_ids(q; limit = missing, kw...)
     else
         []
     end
-end
-
-using Dates
-function date_query(from,to)
-    function unixstring(x)
-        convert(Int64,round(datetime2unix(round(x, Second))))
-    end
-    "date:@$(unixstring(from))..@$(unixstring(to))"
 end
 
 
@@ -868,13 +830,22 @@ part(parg, id::String; kw...) =
     notmuch("show", "--part=$parg", "id:$id"; kw...)
 
 
-function save(id, att; work_path = pwd(), kw...)
+@deprecate save(id, att; work_path = pwd(), kw...) save_attachment(id, att; work_path = pwd(), kw...)
+function save_attachment(id, att; work_path = pwd(), kw...)
     file = joinpath(work_path, att.filename)
     @debug "writing attachment $file"
     open(file,"w") do io
-        print(io, Notmuch.part(att.id, id; kw...))
+        print_attachment(io, att; kw...)
     end
     file
+end
+function print_attachment(io::IO, att; kw...)
+    print(io, Notmuch.part(att.id, att.message_id; kw...))
+end
+
+
+function print_attachment(att; kw...)
+    print_attachment(stdout, att; kw...)
 end
 
 
@@ -1026,7 +997,7 @@ Writes a file and changes tags in xapian.
 """
 function notmuch_insert(mail; tag = [], folder="Draft", kw...)
     tc = tag isa AbstractVector ? tag : [tag]
-    @show tgs = ["$p" for p in tc]
+    tgs = ["$p" for p in tc]
     open(
         Notmuch.notmuch_cmd(
             "insert", "--create-folder" ,"--folder=$folder",
@@ -1097,10 +1068,10 @@ function print_rules()
     print(" and ")
     printstyled(uc," unread",color=:light_blue)
     println(" mail.")
-    trules = tagrules("from:elmail_api_tag")
+    trules = apply_rules("from:elmail_api_tag")
     trulesdf = [
         tc => DataFrame([(query= try
-                              notmuch_query_parser(q;trace=true)
+                              query_parser(q;trace=true)
                           catch err
                               println(q)
                               println(h)
@@ -1239,5 +1210,5 @@ function main()
 end
 
 include("genie.jl")
-
+include("llm.jl")
 end

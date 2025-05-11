@@ -2,7 +2,7 @@ export notmuch_new
 function notmuch_new(; kw...)
     rnew = notmuch("new"; kw...)
     ( new = rnew
-     , tag = tag_new(; kw...)
+     , rules = apply_rules(; kw...)
      , spam = tag_spam(; kw...)
      )
 end
@@ -37,7 +37,7 @@ end
 """
     sync(; cfg = ".offlineimaprc", kw...)
 
-Run system Cmd `offlineimap`,  [`notmuch`](@ref)`("new"), [`tag_spam`](@ref), and [`tag_new`](@ref).
+Run system Cmd `offlineimap`,  [`notmuch`](@ref)`("new"), [`tag_spam`](@ref), and [`apply_rules`](@ref).
 Returns Namedtuple output of these.
 For user `kw...` see [`userENV`](@ref).
 """

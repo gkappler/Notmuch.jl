@@ -18,7 +18,7 @@ usertags(x) =
 
 Prefix is either "+" for adding or "-" for removing a tag.
 """
-struct TagChange
+@auto_hash_equals struct TagChange
     prefix::String
     tag::String
     function TagChange(prefix, tag)
@@ -26,7 +26,7 @@ struct TagChange
         new(prefix,tag)
     end
 end
-
+query(x::AbstractString) = query_parser(x; trace=true)
 function query(x::TagChange)
     if x.prefix == "+"
         NotmuchLeaf{:not}(NotmuchLeaf{:tag}(x.tag))
@@ -84,12 +84,21 @@ function notmuch_tag(batch::Dict;kw...)
         "w", stdout) do io
             for (q, tagchanges) in batch
                 # @info "tag $q" tagchanges
-                println(io, 
-                        replace("$tagchanges", " " => "%20"),
-                        " -- ", q)
+                print_tags(io,tagchanges)
+                println(io, " -- ", q)
+                print_tags(stdout,tagchanges)
+                println(" -- ", q)
             end
         end
 end 
+
+print_tags(io, tags::String) =
+    print_tags(io, TagChange(tags))
+
+print_tags(io, tags::TagChange) =
+    print(io, tags.prefix, replace(tags.tag, " " => "%20"))
+print_tags(io, tags::AbstractVector) =
+    join(io, tags, " ")
 
 notmuch_tag(batch::Pair...; kw...) =
     notmuch_tag(Dict(batch...); kw...)

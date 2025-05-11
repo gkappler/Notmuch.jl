@@ -102,7 +102,7 @@ email_regexp = Sequence(
 #          email =v)
 #     end
 # )
-
+ 
 email_parser = Either(map(email_regexp) do v
                           (name = "", email =v)
                       end
@@ -112,8 +112,7 @@ email_parser = Either(map(email_regexp) do v
                           (name = chomp(v[2] * " " * v[6]), email =v[4])
                       end)
 
-
-notmuch_query_parser = begin
+query_parser = begin
     crit(x) = map(Sequence(x,":", !re"[^ :]+")) do v
         NotmuchLeaf{Symbol(x)}(v[3])
     end
@@ -141,8 +140,8 @@ move_rule_parser =
                     Sentence(map(FolderChange,
                                  Sentence(folder_parser,
                                           folder_parser)),
-                             Optional(integer_base(10); default=0),
-                             notmuch_query_parser)))
+                             Optional(integer_base(10)),
+                             query_parser)))
 tag_parser = join(map(TagChange,
                  Sequence(
                      Either("+", "-"),
@@ -157,14 +156,14 @@ tag_rule_parser =
                 Sentence[1](
                     tag_parser
                     ,"tag")
-                , Optional(integer_base(10), default=0),
-                notmuch_query_parser)
+                , Optional(integer_base(10)),
+                query_parser)
             , Sequence[2](
                 Either("Notmuch.MailTagChange(","Notmuch.RuleMail2("),
                 Sequence(map(TagChange,!Sequence(Either("+", "-"),!Repeat1(CharNotIn(" ")))),
                          Sequence[3](", \"", !Repeat_until(AnyChar(), "\") tag "),
                                      integer_base(10), " "),
-                         notmuch_query_parser))
+                         query_parser))
         ));
 
 
