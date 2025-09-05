@@ -1,4 +1,8 @@
 
+@static if false
+    include("../../CombinedParsers_Dynamic/src/CombinedParsers.jl")
+end
+
 using CombinedParsers
 using CombinedParsers.Regexp
 
@@ -74,17 +78,21 @@ struct Mailbox
     domain::String
 end
 function Base.show(io::IO, x::Mailbox)
-    printstyled(io, x.user; color = :yellow)
-    printstyled(io, "@", x.domain; color = :brown)
+    printstyled(io, x.user; color = :underline)
+    printstyled(io, "@", x.domain; color = :underline)
 end
 ## is this official??
-NameMailbox = NamedTuple{(:name,:email), Tuple{String,Mailbox}}
+NameMailbox = NamedTuple{(:name,:email), <:Tuple{<:AbstractString,Mailbox}}
 function Base.show(io::IO, x::NameMailbox)
-    x.name == "" || printstyled(io,x.name," "; color = :yellow)
-    print(io,x.email)
+    if get(io, :compact, false)
+        print(io,x.email)
+    else
+        x.name == "" || printstyled(io,x.name," "; color = :black)
+        print(io,x.email)
+    end
 end
 
-email_regexp = Sequence(
+@with_names email_regexp = Sequence(
     !re"[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+",
     "@",!re"[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*") do v
         Mailbox(v[1], v[3])
@@ -103,7 +111,7 @@ email_regexp = Sequence(
 #     end
 # )
  
-email_parser = Either(map(email_regexp) do v
+@with_names email_parser = Either(map(email_regexp) do v
                           (name = "", email =v)
                       end
                       , Sequence(re" *\"",:name => !re"[^\"]*",re"\" *<",:email => email_regexp,">")
@@ -112,11 +120,24 @@ email_parser = Either(map(email_regexp) do v
                           (name = chomp(v[2] * " " * v[6]), email =v[4])
                       end)
 
+@with_names recipients_parser = join(Repeat(email_parser), re" *, *")
+
+word_or_quote = Either(Sequence(2,"'", !re"[^']+", "'"),
+                       Sequence(2,"\"", !re"[^\"]+", "\""),
+                       !re"[^ :]+"
+                       )
+
 query_parser = begin
-    crit(x) = map(Sequence(x,":", !re"[^ :]+")) do v
-        NotmuchLeaf{Symbol(x)}(v[3])
+    crit(x) = if x == ""
+        map(word_or_quote) do v
+            NotmuchLeaf{Symbol(" ")}(v)
+        end
+    else
+        map(Sequence(x,":", word_or_quote)) do v
+            NotmuchLeaf{Symbol(x)}(v[3])
+        end
     end
-    @with_names atomic_term = Either(CombinedParser[crit(k) for k in ["from", "tag", "to", "id","thread","date","folder" ] ])
+    @with_names atomic_term = Either(CombinedParser[crit(k) for k in ["from", "tag", "to", "id","thread","date","folder", "subject", "" ] ])
     @with_names leaf_term = Either(CombinedParser[
         map(Sequence(re" *not +", atomic_term)) do v
             NotmuchLeaf{:not}(v[2])
@@ -126,9 +147,14 @@ query_parser = begin
     ort = map(join(leaf_term, re" +or +")) do v
         or_query(v...)
     end
-    term = map(join(ort, re" +and +")) do v
+    andt = map(join(ort, re" +and +")) do v
         and_query(v...)
     end
+    
+    term = map(join(andt, re" +")) do v
+        space_query(v...)
+    end
+    
     pushfirst!(atomic_term, with_name(:parenthesis,Sequence(2,re" *\( *",term,re" *\) *")))
            
     Sequence(1,term,AtEnd())
@@ -142,19 +168,23 @@ move_rule_parser =
                                           folder_parser)),
                              Optional(integer_base(10)),
                              query_parser)))
-tag_parser = join(map(TagChange,
+tag_parser = map(TagChange,
                  Sequence(
                      Either("+", "-"),
-                     !Repeat1(CharNotIn(" ")))),
-                  whitespace
-                  )
+                     !Repeat1(CharNotIn(" "))))
+
+tags_parser = join(tag_parser, whitespace)
 
 tag_rule_parser = 
-    map(MailsRule,
+    map(v -> if v[1] isa AbstractVector
+            [ MailsRule(v1, v[2:end]...) for v1 in v[1] ]
+        else
+            MailsRule(v...)
+        end,
         Either(
             Sentence(
                 Sentence[1](
-                    tag_parser
+                    tags_parser
                     ,"tag")
                 , Optional(integer_base(10)),
                 query_parser)

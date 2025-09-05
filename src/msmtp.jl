@@ -106,7 +106,7 @@ function msmtp_config_string(; account, host, from, user, password, log = "$from
     auth on
     user $(user)
     password $(password)
-    logfile $(logfile)
+    logfile $(log)
     """
 end
 

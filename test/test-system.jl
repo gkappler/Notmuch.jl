@@ -83,7 +83,7 @@ sticky = "(tag:unread or tag:flagged or date:2days..)"
 @testset "actions" begin
     @test Notmuch.query_parser(sticky) |> string == sticky
     @test MailsRule("+draft tag folder:Draft") ==
-        MailsRule(tag"+draft", "folder:Draft")
+        [ MailsRule(TagChange("+draft"), "folder:Draft") ]
     @test MailsRule("mv INBOX Archive not tag:inbox") ==
         MailsRule(FolderChange("INBOX", "Archive"), "not tag:inbox")
 end
@@ -104,6 +104,15 @@ end
 rule"+draft tag folder:Draft" |> apply_rule
 
 
+rule"-inbox tag tag:spam" |> apply_rule
+rule"-inbox tag tag:socialmedia and date:..7d" |> apply_rule
+
+rule"-inbox -new tag from:notmuch.jl" |> apply_rule
+
+
+MailsRule("mv INBOX Archive not ($sticky) and not tag:inbox") |> apply_rule
+
+
 @testset "sync inbox tag and INBOX folder" begin
     @test in("inbox",Email("request").tags) && in("replied",Email("request").tags)
     MailsRule("-inbox tag not ($sticky) and tag:replied") |> apply_rule
@@ -120,7 +129,7 @@ rule"+draft tag folder:Draft" |> apply_rule
 
     # remove inbox flag and stick it there -- (is this a reasonable rule?)
     notmuch_tag("id:request" => "-inbox +flagged", log=true)
-    apply_rules()
+    Notmuch.apply_rules()
     @test startswith(Email("request").filename[1], joinpath(home,"mail","INBOX"))
     
     notmuch_tag("id:request" => "-flagged", log=true)

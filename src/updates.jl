@@ -1,8 +1,15 @@
 export TagChange, FolderChange
 
-@auto_hash_equals struct Agent{name}
-    from_folder::String
-    to_folder::String
+RuleHistory = Dict{Tuple{Any,Query},Vector{Pair{Int,Union{Nothing,Email}}}}
+
+function Base.show(io::IO, x::RuleHistory)
+    for (change, q) in sort(collect(keys(x)))
+        println(io, "\n", change, "  <=  ", q )
+        events = x[(change, q)]
+        for (n,e) in events
+            print(io, " | ", n, " ", e.headers.Date)
+        end
+    end
 end
 
 @auto_hash_equals struct FolderChange
@@ -10,10 +17,11 @@ end
     to_folder::String
 end
 function Base.show(io::IO, x::FolderChange)
-    print(io, styled"mv {yellow:$(x.from_folder)} {green:$(x.to_folder)}")
+    print(io, styled"mv {underline:{grey:$(x.from_folder)}} {inverse:{black:$(x.to_folder)}}")
 end
 query(x::FolderChange) =
     NotmuchLeaf{:folder}(x.from_folder)
+
 
 export @rule_str
 macro rule_str(x)
@@ -34,8 +42,11 @@ export MailsRule
         new{typeof(change)}(change, count, query)
 end
 
+MailsRule(rule::AbstractVector) =
+    length(rule) == 1 ? rule[1] : [ MailsRule(r) for r in rule ]
+
 MailsRule(rule::AbstractString) =
-    rule_parser(rule)
+    rule_parser(rule; trace=true)
 
 query(x::MailsRule) =
     and_query(query(x.change), x.query)
@@ -69,6 +80,10 @@ end
 
 export apply_rule
 apply_rule(r; kw...) = apply_rule(r, "$r"; kw...)
+
+apply_rule(r::AbstractVector, a...; kw...) =
+    [ apply_rule(e, a...; kw...)
+      for e in r ]
 
 function apply_rule(x::MailsRule{FolderChange}, in_reply_to; do_mkdir_prompt::Function=msg -> begin
                         @info msg
@@ -180,7 +195,7 @@ function apply_rule(x::MailsRule{FolderChange}, in_reply_to; do_mkdir_prompt::Fu
         notmuch_insert(
             rfc;
             folder = "notmuch_rule/mv",
-            tag = tag"+rule/mv",
+            tag = tag"+rule/mv -inbox -new",
             kw...
                 )
         notmuch(:new; kw...)
@@ -194,6 +209,19 @@ end
 apply_rule(x::MailsRule{<:AbstractVector}, a...; kw...) =
    vcat( [ apply_rule(MailsRule(tc,x.count,x.query), a...; kw...)
       for tc in x.change ]...)
+
+function apply_rule(x::MailsRule{<:Function}, in_reply_to; kw...)
+    q = x.query
+    affected = notmuch_count(q; kw...)
+    if affected > 0
+        ids = notmuch_ids(q; kw...)
+        rfc = x.change(ids)
+        ids
+    else
+        []
+    end
+end
+
     
 
 
@@ -226,22 +254,9 @@ function apply_rule(x::MailsRule{TagChange}, in_reply_to; kw...)
         notmuch_insert(
             rfc;
             folder = "notmuch_rule/tag",
-            tag = tag"+rule/tag",
+            tag = tag"+rule/tag -inbox -new",
             kw...
         )
-        ids
-    else
-        []
-    end
-end
-
-
-function apply_rule(x::MailsRule{<:Function}, in_reply_to; kw...)
-    q = x.query
-    affected = notmuch_count(q; kw...)
-    if affected > 0
-        ids = notmuch_ids(q; kw...)
-        rfc = x.change(ids)
         ids
     else
         []
@@ -275,30 +290,30 @@ end
 function apply_rules(q="from:notmuch.jl"; pars...)
     local rh = rule_history(q; pars...)
     local count = 0
-    for (rule, queries) in rh
+    for ((rule, query), history) in rh
         local rule_count = 0
-        for (query, history) in pairs(queries)
-            local N, email = history[1]
-            local current_run = @show apply_rule(MailsRule(rule,N,query), email.id; pars...)
-            empty!(history)
-            pushfirst!(history, length(current_run) => nothing)
-            rule_count += length(current_run)
-        end
+        #println(rule)
+        #println(history)
+        #@info "rule" rule history
+        local N, email = history[1]
+        local current_run = apply_rule(MailsRule(rule,N,query), email.id; pars...)
+        empty!(history)
+        pushfirst!(history, length(current_run) => nothing)
+        rule_count += length(current_run)
         count += length(rule_count)
     end
     rh
 end
 
 
-function rule_history(q="from:notmuch.jl"; remove_errors=true, kw...)
-    history = [ Email(x) => MailsRule(x.headers.Subject)
-      for x in flatten(
-           notmuch_show(q
-                       ; body = false
-                       , kw...))
-          ] #rule_history(q; kw...)
+
+
+function rule_history_old(q="from:notmuch.jl"; remove_errors=true, kw...)
+    history = [ Email(x; body=false) for x in notmuch_ids(q; kw...)  ]
+    @info "history of $(length(history)) matching $q"
     tcs = Dict()
-    for (email, r) in history
+    for (email) in history
+        r = MailsRule(email.headers.Subject)
         if r.count > 0
             rd = get!(
                 get!(tcs, r.change) do
@@ -311,6 +326,44 @@ function rule_history(q="from:notmuch.jl"; remove_errors=true, kw...)
         else
             @warn "unknown email" r
             for f in r.filename
+                if remove_errors
+                    trash(f)
+                else
+                    println("rm $f")
+                end
+            end
+        end
+    end
+    tcs
+end
+
+
+add_rule!(tcs, r::AbstractVector, email) =
+    for e in r
+        add_rule!(tcs, e, email)
+    end
+        
+
+add_rule!(tcs, r, email) =
+    if r.count > 0
+        rd = get!(tcs, (r.change, r.query)) do
+            []
+        end
+        push!(rd, r.count => email )
+    else
+    end
+
+function rule_history(q="from:notmuch.jl"; remove_errors=true, kw...)
+    history = [ Email(x; body=false) for x in notmuch_ids(q; kw...)  ]
+    @info "history of $(length(history)) matching $q"
+    tcs = RuleHistory()
+    for (email) in history
+        try 
+            r = MailsRule(email.headers.Subject)
+            add_rule!(tcs, r, email)
+        catch err
+            @warn "unknown rule history email $err" email
+            for f in email.filename
                 if remove_errors
                     trash(f)
                 else

@@ -2,11 +2,47 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Genie :: The Highly Productive Julia Web Framework</title>
+    <title>Notmuch Mail</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BmbxuPwQa2lc/FVzBcNJ7UAyJxM6wuqIj61tLrc4wSX0szH/Ev+nYRRuWlolflfl" crossorigin="anonymous">
+    <style>
+      .counter { float:right;}
+      .date_relative {float:right;}
+      .tags {float:right;}
+      .thread{
+	  border-width: 1px;
+	  border-style: solid;
+	  border-radius: 10px;
+	  border-color: darkgray;
+      }
+      .thread > div {
+ 	  padding: 5px;
+      }
+      .threadlevel {
+ 	  padding-left: 1em;
+      }
+      .to {
+ 	  color: gray;
+      }
+      .cc {
+ 	  color: gray;
+      }
+      .recipients {
+	  margin-left: 5em;
+      }
+      .pre {
+	  white-space: pre-line;
+      }
+      .subject {
+          font-weight: bold;
+      }
+
+    </style>
   </head>
   <body>
+    <div class="container">
     <%
       @yield
     %>
+    </div>
   </body>
 </html>

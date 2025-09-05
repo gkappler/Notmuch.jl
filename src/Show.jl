@@ -33,7 +33,7 @@ function Headers(x)
              for k in fieldnames(Headers))...)
 end
 
-trim(x) = replace(x, r"^[ \n\t\r]+" => "", r"[ \n\t\r]+$" => "")
+#trim(x) = replace(x, r"^[ \n\t\r]+" => "", r"[ \n\t\r]+$" => "")
 
 """
     PlainContent{type}
@@ -53,8 +53,11 @@ struct Content{type}
     content_length::Union{Nothing,Int}
 end
 Base.show(io::IO, x::Content{Symbol("text/plain")}) =
-    print(io,trim(x.content))
+    print(io,chomp(x.content))
 
+function Base.show(io::IO, x::Content{Symbol("multipart/mixed")}) 
+    print(io,x.content[1])
+end
 function Base.show(io::IO, x::Content{Symbol("multipart/alternative")}) 
     print(io,x.content[1])
 end
@@ -114,9 +117,9 @@ tagsymbols = Dict(
 )
 
 function printtag(io::IO,x)
-    printstyled(io, " ",
+    printstyled(io, "",
                 get(tagsymbols,x) do
-                    "#"*x
+                    ":"*x
                 end; color=:cyan)
 end
 
@@ -148,22 +151,26 @@ end
 show(id::AbstractString; body=false, kw...) =
     first(flatten(notmuch_show("id:$id"; body = body, kw...)))
 
-
+function pretty_email(x)
+    r = tryparse(email_parser,x)
+    r === nothing ? x : r
+end
 function Base.show(io::IO, x::Email)
     if get(io, :compact, false)
         showline(io,x)
     else
-        #ae = tryparse(author_email,x.headers.From)
+        ae = pretty_email(x.headers.From)
         printstyled(io, x.date_relative, " ")
-        print(io, email_parser(x.headers.From))
+        print(io, pretty_email(x.headers.From), " => ", pretty_email.(x.headers.To))
         println(io)
-        printstyled(io, x.headers.Subject; bold=true)
+        printstyled(io, x.headers.Subject, " "; bold=false)
         for t in x.tags
             printtag(io,t)
         end
         for c in x.body
             print(io, "\n", c)
         end
+        ##println(io)
     end
 end
 
@@ -188,13 +195,15 @@ showline(x::Email) =
     showline(stdout,x)
 
 function showline(io::IO, x::Email)
+    ae = pretty_email(x.headers.From)
     printstyled(io, x.timestamp, " ")
-    print(io, email_parser(x.headers.From))
+    print(io, ae)
     print(io,": ")
-    printstyled(io, x.headers.Subject, " "; bold=true)
+    printstyled(io, x.headers.Subject, " "; bold=false)
     for t in x.tags
         printtag(io,t)
     end
+    ##println(io)
 end
 
 showfield(::Val, x::Union{AbstractString, Bool, Number}) = x

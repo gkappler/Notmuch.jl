@@ -375,3 +375,4 @@ notmuch_commands_off = [
 
     # "setup" => "Interactively set up notmuch for first use.",
 ]
+

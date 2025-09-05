@@ -14,6 +14,4 @@ makedocs(
     modules = [Notmuch]
 )
 
-deploydocs(
-    repo = "github.com/gkappler/Notmuch.jl.git",
-)
+# deploydocs( repo = "github.com/gkappler/Notmuch.jl.git")

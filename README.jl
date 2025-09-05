@@ -1,11 +1,17 @@
 # # Notmuch.jl
 
-# is a julia wrapper for [notmuch mail](https://notmuchmail.org/) indexer (that supports arbitrary tags and advanced search).
+# is a julia wrapper for [notmuch mail](https://notmuchmail.org/)
+# indexer (that supports arbitrary tags and advanced search).
 # Notmuch mail indexes emails into a xapian database.
 # Emails need to be stored in maildir standard.
-# - maildir can be smoothly synchronized with an IMAP server by [offlineimap](http://www.offlineimap.org/).
-# - maildir is an archiving standard for email datasets. `Notmuch.jl` opens such email data up for analyses in Julia.
+#
+# maildir is an archiving standard for email datasets.
+# With `Notmuch.jl` you can search in maildir data
 # 
+# maildir can be synchronized with
+# - IMAP servers using [offlineimap](http://www.offlineimap.org/).
+# - gmail using [Lieer](https://github.com/gauteh/lieer)
+#
 # On linux with a `notmuch` setup your user mails are searched by default.
 # Keyword argument `user` switches the `maildir` (and database) to
 # `joinpath(ENV["NOTMUCHJL"],"home")`.
@@ -14,13 +20,22 @@
 #
 # ## Prerequistes
 # The package wraps external `Cmd` calls to
-# 1.  notmuch,
-# 2. offlineimap, and
-# 3. msmtp(?)
+# - [notmuch mail](https://notmuchmail.org/)
+#
+# On most *x OS you can install as packages, e.g.
+# ```
+# sudo apt install notmuch 
+# ```
+#
+# ## Supported mail software
+# - [offlineimap](http://www.offlineimap.org/), and
+# - gmail using [Lieer](https://github.com/gauteh/lieer)
+# - for sending emails we use [msmtp](https://marlam.de/msmtp/) and
+#   [my fork of SMTPClient.jl](https://github.com/gkappler/SMTPClient.jl).  
 # 
 # On most *x OS you can install as packages, e.g.
 # ```
-# sudo apt install notmuch offlineimap msmtp
+# sudo apt install offlineimap msmtp
 # ```
 #
 # Install my SMTPClient fork
@@ -29,6 +44,7 @@
 # ```
 #
 # I would love to merge a pull request adding these libraries as julia artifacts.
+#
 # ### Windows?
 # I have no idea whether Windows users can use the package installation route. (If you succeed, let us know how!)
 # But you can use `docker-compose` to run a dockerized version (inconvenient for a REPL, but convenient for using the HTTP Api).
@@ -37,54 +53,52 @@
 # # Email search functions
 
 # ## Inserting a mail or draft
-using Notmuch
-notmuch_insert(
-    rfc_mail(from="me@crazy.2022",
-             to=[ "brothers@crazy.2022", "sisters@crazy.2022" ],
-             cc=[ "holy_cow@confusing.hell",
-                  "holy_spirit@discerning.heaven" ],
-             bcc=[ "me@crazy.2022" ],
-             subject="Please sponsor open source development!",
-             tags=[ "draft", "appeal" ],
-             body="""
+using SMTPClient
+rfc = rfc_mail(from="me@crazy.2022",
+               to=[ "brothers@crazy.2022", "sisters@crazy.2022" ],
+               cc=[ "holy_cow@confusing.hell",
+                    "holy_spirit@discerning.heaven" ],
+               bcc=[ "me@crazy.2022" ],
+               subject="Please sponsor open source development!",
+               messageid="for_this_you_must_come_up_with_something_unique",
+               keywords=[ "draft", "appeal" ],
+               content=Plain("""
                   Dear Brothers and Sisters, 
 
-                  Do we need decentrally developed open source computer software, that your neighbor can help you (tinker) with?
+                  Do we need decentrally developed open source computer software,
+                  that your neighbor can help you (tinker) with?
                   Please sponsor open source tools, that we need in the time to come!
 
                   Do you want email search with an unbreakable message archive on your own computer?
                   With no lock in but plain text message files in maildir standard?
-                  Then you can sponsor my development of Notmuch.jl and eλmail!
+                  Then you can sponsor development of Notmuch.jl and eλmail!
                     
                   Please sponsor any open source project you would love to manifest!
         
                   Thank you so much! Love, peace and self mastery to us!
 
                   Gregor
-                  """),
-    folder="drafts")
+                  """))
 
-# `insert` currently does not return any message id.
-# One (concurrency unsafe) way to show the inserted message might be:
+using Notmuch
+notmuch_insert(rfc, folder="drafts")
+
 # ## Show mail
-notmuch_show(notmuch_search("*", limit=1)[1]["thread"])
+notmuch_show(notmuch_search("id:for_this_you_must_come_up_with_something_unique", limit=1)[1]["thread"])
 
 
 # ## Mail Counts
 notmuch_count("notmuch.jl julia")
 
 # ## Mail Search
-
 notmuch_search("notmuch.jl julia")
 
 # By default, notmuch json output format is returned.
 # With the first argument, results are converted to the `Thread` type of `Notmuch.jl`:
-
 notmuch_search(Thread, "notmuch.jl julia")
 
 #
 # ## Trees
-
 notmuch_tree(Emails,"notmuch.jl julia")
 # Julia types are also provided for `Email`, `Header`, `Mailbox` adresses 
 # and `content`.

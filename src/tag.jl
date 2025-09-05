@@ -26,7 +26,7 @@ Prefix is either "+" for adding or "-" for removing a tag.
         new(prefix,tag)
     end
 end
-query(x::AbstractString) = query_parser(x; trace=true)
+
 function query(x::TagChange)
     if x.prefix == "+"
         NotmuchLeaf{:not}(NotmuchLeaf{:tag}(x.tag))
@@ -38,19 +38,13 @@ end
 function TagChange(tag)
     tag_parser(tag)
 end
-
+TagChanges(x) = tags_parser(x)
 export @tag_str
 macro tag_str(x)
     quote
-        TagChange($x)
+        TagChanges($x)
     end
 end
-
-Base.isequal(x::TagChange, y::TagChange) =
-    x.tag == y.tag && x.prefix == y.prefix
-
-Base.isless(x::TagChange, y::TagChange) =
-    isless(x.prefix, y.prefix) || (isequal(x.prefix, y.prefix)  && isless(x.tag, y.tag))
 
 function StyledStrings.annotatedstring(x::TagChange)
     removed = x.prefix == "-"
@@ -86,8 +80,8 @@ function notmuch_tag(batch::Dict;kw...)
                 # @info "tag $q" tagchanges
                 print_tags(io,tagchanges)
                 println(io, " -- ", q)
-                print_tags(stdout,tagchanges)
-                println(" -- ", q)
+                ##print_tags(stdout,tagchanges)
+                ##println(" -- ", q)
             end
         end
 end 
@@ -106,3 +100,27 @@ notmuch_tag_from(batch::Pair{<:AbstractString,<:AbstractString}...; kw...) =
     notmuch_tag(Dict("from:$f" => [TagChange(t) for t in split(x," ")]
                      for (f,x) in batch); kw...)
     
+
+
+
+function is_spam(id; kw...)
+    file = notmuch_search("id:$id","--output=files"; limit=1, kw...)[1]
+    for l in eachline(file)
+        if l in [ "X-Spam-Flag: YES", "X-Spam: Yes" ]
+            return true
+        end
+        ##println(l)
+        l == "" && break
+    end
+    return false
+end
+
+function tag_spam(query="tag:new"; tag="spam", limit= 100, kw...)
+  for id in notmuch_search("($query) and (not tag:$tag)","--output=messages"; limit = limit, kw...)
+      if is_spam(id; kw...)
+          @info "spam id:$id"
+          println(Email(id; kw...))
+          notmuch_tag("id:$id" => TagChange("+",tag); kw...)
+      end
+  end
+end
