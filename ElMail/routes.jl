@@ -4,7 +4,7 @@ using Genie.Requests
 using Genie.Responses
 
 using Notmuch
-ENV["NOTMUCHJL"] = "/mnt/windows/elmail"
+ENV["NOTMUCHJL"] = "/home/gregor/dev/julia/Notmuch-deploy/"
 ENV["MAILDIR"] = "/home/gregor"
 ENV["NOHOME"] = "/home/gregor"
 

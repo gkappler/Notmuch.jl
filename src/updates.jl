@@ -77,6 +77,25 @@ function ynp(x)
         false
     end
 end
+const MAILDIR_SUBS = ("cur","new","tmp")
+
+"""
+    ensure_maildir!(folder::AbstractString) -> Bool
+
+Ensure standard Maildir subdirectories exist under `folder`’s parent.
+Returns true if ready to move into `joinpath(folder)`.
+Throws on non-standard suffix.
+"""
+function ensure_maildir!(target_folder::AbstractString)
+    sub = basename(target_folder)
+    sub in MAILDIR_SUBS || error("Target '$target_folder' must end with cur/new/tmp")
+    root = dirname(target_folder)
+    for s in MAILDIR_SUBS
+        mkpath(joinpath(root, s))
+    end
+    isdir(target_folder) || error("Failed to create '$target_folder'")
+    return true
+end
 
 export apply_rule
 apply_rule(r; kw...) = apply_rule(r, "$r"; kw...)
@@ -90,59 +109,11 @@ function apply_rule(x::MailsRule{FolderChange}, in_reply_to; do_mkdir_prompt::Fu
                         true
                     end, kw...)
     function perform_mv(f, target_folder; revertio)
-        fname=basename(f)
-        dname=dirname(f)
-        target_file = if isdir(target_folder)
-            joinpath(target_folder,fname)
-        elseif isfile(target_folder)
-            target_folder
-        else ## does not exist!
-            root = dirname(target_folder)
-            sub = basename(target_folder)
-            if do_mkdir_prompt("Make path $root and ensure Maildir structure")
-                # Standard Maildir subdirectories
-                maildir_subs = ["cur", "new", "tmp"]
-
-                if sub in maildir_subs
-                    # Assume 'folder' is like /path/to/maildir/.Archive/cur
-                    # We need to ensure /path/to/maildir/.Archive/cur, new, tmp exist
-                    # The parent directory of 'folder' is the Maildir folder itself (e.g., .Archive)
-                    maildir_root = root
-                    try
-                        # Create all standard subdirectories within the parent
-                        for s in maildir_subs
-                            mkpath(joinpath(maildir_root, s))
-                        end
-                        @info "Created Maildir structure at $maildir_root"
-                        # After creation, check if the specific target sub-directory exists
-                        if !isdir(target_folder)
-                            # This should ideally not happen if mkpath succeeded
-                            error("Failed to create target directory '$target_folder' even after mkpath.")
-                        end
-                        #return true # Directory created/ensured
-                    catch e
-                        @error "Failed to create directory structure for $target_folder" exception=(e, catch_backtrace())
-                        return false # Failed to create
-                    end
-                else
-                    # If the target's basename isn't cur, new, or tmp, the original code errored.
-                    # Maintain this behavior.
-                    error("Target folder '$target_folder' does not end in 'cur', 'new', or 'tmp'. Not a standard Maildir target according to original logic.")
-                    # If general directory creation were desired:
-                    # try
-                    #     mkpath(folder)
-                    #     @info "Created directory $folder"
-                    #     return true
-                    # catch e
-                    #     @error "Failed to create directory $folder" exception=(e, catch_backtrace())
-                    #     return false
-                    # end
-                end
-            end
-            joinpath(target_folder,fname)
-        end
-        mv(f,target_file)
-        println(revertio,"mv $target_file $dname")
+        fname = basename(f); dname = dirname(f)
+        ensure_maildir!(target_folder)
+        target_file = joinpath(target_folder, fname)
+        mv(f, target_file; force=true)
+        println(revertio, "mv $target_file $dname")
     end
     mdir=maildir(;kw...)
     q = query(x)

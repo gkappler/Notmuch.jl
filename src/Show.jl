@@ -1,4 +1,5 @@
 export Email
+using SMTPClient
 
 """
     Headers
@@ -13,12 +14,21 @@ struct Headers
     Date::DateTime #  format: Sat, 28 May 2022 10:03:20 +0100
 end
 headerfield(::Val{:Date}, x::Nothing) = now()
-headerfield(::Val{:Date}, s::AbstractString) =
-    parse(DateTimeParser("e, d u y H:M:S"), s)
+function headerfield(::Val{:Date}, s::AbstractString)
+    for fmt in (Dates.DateFormat("e, d u Y H:M:S z"),
+                Dates.DateFormat("e, d u Y H:M:S"))
+        try
+            return Dates.parse(fmt, s)
+        catch
+        end
+    end
+    # last resort: keep relative time from notmuch or now()
+    return now()
+end
 
-headerfield(::Val, x) = x
+# headerfield(::Val, x) = x
 
-headerfield(::Val, x::Nothing) = ""
+# headerfield(::Val, x::Nothing) = ""
 
 function StyledStrings.annotatedstring(x::Headers) 
     styled"{date:$(x.Date)}\n$(x.Subject)\nFrom: {from:$(x.From)}"  *
@@ -65,21 +75,6 @@ function Base.show(io::IO, x::Content{Symbol("multipart/related")})
     print(io,x.content[1])
 end
 
-find(pred::MIME{mime}, x::PlainContent) where mime =
-    nothing
-
-find(pred::MIME{Symbol("text/plain")}, x::PlainContent) =
-    x
-
-find(pred::MIME{mime}, x::Content{Symbol("text/plain")}) where mime =
-    x
-
-function find(pred::MIME{mime}, x::Content{Symbol("multipart/mixed")}) where mime 
-    for sc in x.content
-        r = find(sc)
-        r !== nothing && return r
-    end
-end
 
 contentfield(::Val, x::Union{Nothing,AbstractString, Number}) = x
 contentfield(::Val{:content}, x::Union{Nothing,AbstractString, Number}) = x
@@ -148,7 +143,7 @@ function Email(id::AbstractString; body=false, kw...)
     r = flatten(notmuch_show("id:$id"; body = body, kw...))
     isempty(r) ? nothing : Email(first(r))
 end
-show(id::AbstractString; body=false, kw...) =
+notmuch_show(id::AbstractString; body=false, kw...) =
     first(flatten(notmuch_show("id:$id"; body = body, kw...)))
 
 function pretty_email(x)
@@ -324,3 +319,24 @@ function Emails(x::AbstractVector)
     end
 end
 export Emails
+
+# Find "by MIME"
+find(::MIME{mime}, ::PlainContent) where {mime} = nothing
+find(::MIME"text/plain", x::PlainContent) = x
+
+find(::MIME{mime}, x::Content{Symbol("text/plain")}) where {mime} = x
+
+function find(m::MIME, x::Content{Symbol("multipart/mixed")})
+    for sc in x.content
+        r = find(m, sc)
+        r !== nothing && return r
+    end
+    return nothing
+end
+
+# Alternative/related treated like mixed (depth-first)
+find(m::MIME, x::Content{Symbol("multipart/alternative")}) =
+    find(m, Content{Symbol("multipart/mixed")}(x.id, x.content_charset, x.content, x.content_transfer_encoding, x.content_length))
+find(m::MIME, x::Content{Symbol("multipart/related")}) =
+    find(m, Content{Symbol("multipart/mixed")}(x.id, x.content_charset, x.content, x.content_transfer_encoding, x.content_length))
+

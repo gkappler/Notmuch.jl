@@ -20,12 +20,9 @@ and_query(x1::NotmuchQueryOperator{:and},x...) = NotmuchQueryOperator{:and}(Any[
 
 
 or_query(x) = x
-or_query(x1::NotmuchLeaf{:from},x2::NotmuchLeaf{:to}) =
-    if x1.value==x2.value
-        NotmuchLeaf{:fromto}(x1.value)
-    else
-        NotmuchQueryOperator{:or}(Any[x1,x...])
-    end
+or_query(x1::NotmuchLeaf{:from}, x2::NotmuchLeaf{:to}) =
+    x1.value == x2.value ? NotmuchLeaf{:fromto}(x1.value) :
+    NotmuchQueryOperator{:or}(Any[x1, x2])
 or_query(x1,x...) = NotmuchQueryOperator{:or}(Any[x1,x...])
 or_query(x1::NotmuchQueryOperator{:or},x...) = NotmuchQueryOperator{:or}(Any[x1.subqueries...,x...])
 
@@ -79,3 +76,87 @@ function qstring(x::NotmuchQueryOperator{op}) where op
     "(" * join(qstring.(x.subqueries), " $op ")* ")"
 end
 Base.string(x::Query) = qstring(x)
+
+
+# plain renderer (no styles)
+render(x::NotmuchLeaf{Symbol(" ")}) = string(x.value)
+render(x::NotmuchLeaf{:from})   = "from:$(x.value)"
+render(x::NotmuchLeaf{:to})     = "to:$(x.value)"
+render(x::NotmuchLeaf{:fromto}) = "(from:$(x.value) or to:$(x.value))"
+render(x::NotmuchLeaf{:tag})    = "tag:$(x.value)"
+render(x::NotmuchLeaf{:id})     = "id:$(x.value)"
+render(x::NotmuchLeaf{:thread}) = "thread:$(x.value)"
+render(x::NotmuchLeaf{:date})   = "date:$(x.value)"
+render(x::NotmuchLeaf{:folder}) = "folder:$(x.value)"
+render(x::NotmuchLeaf{:subject})= "subject:$(x.value)"
+render(x::NotmuchLeaf{:not})    = "not $(x.value isa NotmuchQueryOperator ? "(" * render(x.value) * ")" : render(x.value))"
+
+render(x::NotmuchQueryOperator{op}) where {op} =
+    "(" * join(render.(x.subqueries), " $(op) ") * ")"
+
+# Stable plain renderer (machine)
+qplain(q::Query) = render(normalize(q))
+
+normalize(q::NotmuchLeaf) = q
+
+function normalize(q::NotmuchQueryOperator{op}) where {op}
+    subs = map(normalize, q.subqueries)
+    # Flatten nested same-op
+    flat = reduce(Any[], subs) do acc, s
+        if s isa NotmuchQueryOperator{op}
+            append!(acc, s.subqueries)
+        else
+            push!(acc, s)
+        end
+        acc
+    end
+    # Idempotence and set-like behavior for and/or
+    uniq = if op in (:and, :or, Symbol(" "))
+        # de-duplicate leaves by hash; keep order stable-ish
+        seen = Set{UInt}()
+        out = Any[]
+        for e in flat
+            h = hash(e)
+            if !(h in seen)
+                push!(out, e); push!(seen, h)
+            end
+        end
+        out
+    else
+        flat
+    end
+
+    # Special rule: (from:x or to:x) -> fromto:x, even after flatten
+    if op == :or
+        leaves = filter(x -> x isa NotmuchLeaf, uniq)
+        rest   = filter(x -> !(x isa NotmuchLeaf), uniq)
+        # Group by value for from/to
+        ft = Dict{Any,Tuple{Bool,Bool}}()
+        for l in leaves
+            if l isa NotmuchLeaf{:from}
+                ft[l.value] = (true, get(ft, l.value, (false,false))[2])
+            elseif l isa NotmuchLeaf{:to}
+                ft[l.value] = (get(ft, l.value, (false,false))[1], true)
+            end
+        end
+        out = Any[]
+        for l in leaves
+            if l isa NotmuchLeaf{:from} && get(ft, l.value, (false,false)) == (true,true)
+                # skip from; emit fromto once later
+            elseif l isa NotmuchLeaf{:to} && get(ft, l.value, (false,false)) == (true,true)
+                # skip to
+            else
+                push!(out, l)
+            end
+        end
+        # add fromto leaves
+        for (v,(hf,ht)) in ft
+            if hf && ht
+                push!(out, NotmuchLeaf{:fromto}(v))
+            end
+        end
+        uniq = vcat(out, rest)
+    end
+
+    NotmuchQueryOperator{op}(uniq)
+end

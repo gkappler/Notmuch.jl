@@ -7,7 +7,7 @@
 checkpath!(x) = !isdir(x) && mkpath(x)
 
 """
-    userENV(; workdir= get(ENV,"NOTMUCHJL",pwd()), homes = joinpath(workdir, "home"), user = nothing)
+    userENV(; workdir= get(ENV,"NOTMUCH_WD",pwd()), homes = joinpath(workdir, "home"), user = nothing)
 
 Construct environment `Dict("HOME" => joinpath(homes,user), "MAILDIR" => joinpath(homes,user,"maildir"))`.
 

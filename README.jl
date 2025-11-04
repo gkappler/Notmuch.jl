@@ -83,6 +83,18 @@ rfc = rfc_mail(from="me@crazy.2022",
 using Notmuch
 notmuch_insert(rfc, folder="drafts")
 
+# ### Usage examples: Sending
+# Single pass, auto-dispatch per sender:
+# Ensure ~/.msmtprc is present and parsed by Notmuch.msmtp_config()
+r = Notmuch.send_outbox()
+@info "sent=$(length(r.sent)) failed=$(length(r.failed)) skipped=$(length(r.skipped))"
+
+# Per-sender run (skip other senders):
+Notmuch.send_outbox(; filter_sender="me@example.com")
+
+# Queue mail in Outbox:
+Notmuch.queue_mail(; subject="Hello", content="Body", to=["you@example.com"], from="me@domain")
+
 # ## Show mail
 notmuch_show(notmuch_search("id:for_this_you_must_come_up_with_something_unique", limit=1)[1]["thread"])
 
@@ -140,5 +152,6 @@ notmuch_search(Thread, "notmuch.jl julia")
 # @headers "notmuch.jl julia"
 # @emails "notmuch.jl julia"
 # ```
+
 
 

@@ -154,16 +154,11 @@ export notmuch_search
 
 export notmuch_ids
 function notmuch_ids(q; limit = missing, kw...)
-    limit = limit === missing ? Notmuch.notmuch_count(q; kw...) : limit
-    if limit > 0
-            Notmuch.notmuch_search(
-                q, "--limit=$limit", "--output=messages";
-                limit = limit, kw...)
-    else
-        []
-    end
+    limit === missing && (limit = Notmuch.notmuch_count(q; kw...))
+    return limit > 0 ?
+        Notmuch.notmuch_search(q, "--limit=$limit", "--output=messages"; kw...) :
+        String[]
 end
-
 """
     notmuch_address(q, a...; target=1000, kw...)
 
@@ -248,9 +243,8 @@ function userEmail(user)
     user === nothing ? "elmail_api_tag@" * host : user * "@" * host
 end
 
-using SMTPClient
-include("outbox.jl")
-export queue_mail, send_outbox, outbox_ids, smtp_settings, SMTPSettings
+# Export the correct names
+export queue_mail, send_outbox, outbox_ids, smtp_settings_map, SMTPSettings
 export rfc_mail
 
 """
@@ -321,6 +315,21 @@ function rfc_mail(subject::AbstractString, content::AbstractString="";
 end
 
 
+_tagflag(x::TagChange) = x.prefix * replace(x.tag, " " => "%20")
+_tagflag(x::AbstractString) = x
+_tagflags(v::AbstractVector) = map(_tagflag, v)
+
+export escape_id
+"""
+    escape_id(id::AbstractString) -> String
+
+Ensure message-id is wrapped in angle brackets for notmuch id: queries.
+If already wrapped, returns as-is.
+"""
+escape_id(id::AbstractString) = begin
+    s = strip(id)
+    (startswith(s, "<") && endswith(s, ">")) ? s : "<" * s * ">"
+end
 
 """
     notmuch_insert(mail; folder="juliatest")
@@ -328,23 +337,28 @@ end
 Insert `mail` as a mail file into `notmuch` (see `notmuch insert`).
 Writes a file and changes tags in xapian.
 """
-function notmuch_insert(mail; tag = [], folder="Draft", kw...)
-    tc = tag isa AbstractVector ? tag : [tag]
-    tgs = ["$p" for p in tc]
+function notmuch_insert(mail; tag = TagChange[], folder="Draft", kw...)
+    tgs = tag isa AbstractVector ? _tagflags(tag) : [_tagflag(tag)]
     open(
-        Notmuch.notmuch_cmd(
-            "insert", "--create-folder" ,"--folder=$folder",
-            tgs...;
-            kw...
-                ),
-        "w", stdout) do io
-            println(io,mail)
-        end
+        notmuch_cmd("insert", "--create-folder", "--folder=$folder", tgs...; kw...),
+        "w", stdout,
+    ) do io
+        println(io, mail)
+    end
 end
+
 export notmuch_insert
 
+_toarg(x) = x
+_toarg(x::Query) = render(x)
 
-include("msmtp.jl")
+# Overloads to accept Query
+notmuch_count(q::Query, x...; kw...) = notmuch_count(_toarg(q), map(_toarg, x)...; kw...)
+notmuch_search(q::Query, x...; offset=0, limit=LIMIT, kw...) =
+    notmuch_search(_toarg(q), map(_toarg, x)...; offset, limit, kw...)
+notmuch_show(q::Query, x...; kw...) =
+    notmuch_show(_toarg(q), map(_toarg, x)...; kw...)
+notmuch_ids(q::Query; limit=missing, kw...) = notmuch_ids(_toarg(q); limit, kw...)
 
 function replies(id)
     notmuch_search
@@ -356,6 +370,12 @@ include("gmi.jl")
 query(x::AbstractString) = query_parser(x; trace=true)
 
 include("setup.jl")
+
+using SMTPClient
+include("msmtp.jl")
+include("outbox.jl")
+# Make Outbox symbols available at top-level
+using .Outbox: SMTPSettings, smtp_settings_map, queue_mail, outbox_ids, send_outbox
 
 # Function to be called when the module is loaded
 function __init__()
@@ -497,6 +517,7 @@ initrepl() =
         prompt_color = :red, 
         start_key='~', 
         mode_name="notmuch_mode")
+
 
 
 end
