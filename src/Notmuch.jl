@@ -300,7 +300,7 @@ function rfc_mail(subject::AbstractString, content::AbstractString="";
     io = SMTPClient.get_body(
         to, from,
         subject,
-        SMTPClient.Plain(content);
+        SMTPClient.PlainContent(content);
         cc=cc,
         bcc=bcc,
         replyto=replyto,

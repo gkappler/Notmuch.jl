@@ -154,7 +154,7 @@ function apply_rule(x::MailsRule{FolderChange}, in_reply_to; do_mkdir_prompt::Fu
             content = 
                 MultiPart(
                     :mixed,
-                    SMTPClient.Plain(mv_summary * String(take!(body))),
+                    SMTPClient.PlainContent(mv_summary * String(take!(body))),
                     SMTPClient.MIMEContent(
                         "revert-mv.sh",
                         ## 
@@ -210,7 +210,7 @@ function apply_rule(x::MailsRule{TagChange}, in_reply_to; kw...)
             content = 
                 MultiPart(
                     :mixed,
-                    SMTPClient.Plain(""),
+                    SMTPClient.PlainContent(""),
                     SMTPClient.MIMEContent(
                         "revert-notmuch.ids",
                         ## 
@@ -379,7 +379,7 @@ For user `kw...` see [`userENV`](@ref).
 #                     (folder = "elmail/tag", tags = [ TagChange("+tag") ], 
 #                      rfc_mail = rfc_mail(from = from, to = to, 
 #                                          in_reply_to = "<" * ids[1] * ">",
-#                                          subject = "$tc tag", content= SMTPClient.Plain(body)))
+#                                          subject = "$tc tag", content= SMTPClient.PlainContent(body)))
 #                 else
 #                     (folder = "elmail/autotag", tags = [ TagChange("+autotag") ],
 #                      rfc_mail = rfc_mail(
@@ -393,7 +393,7 @@ For user `kw...` see [`userENV`](@ref).
 #                          content = 
 #                              MultiPart(
 #                                  :mixed,
-#                                  SMTPClient.Plain(body),
+#                                  SMTPClient.PlainContent(body),
 #                                  SMTPClient.MIMEContent(
 #                                      "notmuch.ids",
 #                                      ## 

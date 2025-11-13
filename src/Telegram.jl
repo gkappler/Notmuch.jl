@@ -55,7 +55,7 @@ function importChatExport(filename;  to,  email = telegram_mail)
                      to = to,
                      date = unix2datetime(parse(Int,m[:date_unixtime])),
                      subject =  m[:action],
-                     content = SMTPClient.Plain(""),
+                     content = SMTPClient.PlainContent(""),
                      messageid = telegram_id(m[:id]),
                      keywords = ["telegram", m[:action]])
         elseif m[:type] == "message"
@@ -72,7 +72,7 @@ function importChatExport(filename;  to,  email = telegram_mail)
                      messageid = telegram_id(m[:id]),
                      inreplyto = telegram_id(get(m, :reply_to_message_id, nothing)),
                      subject =  ls[1],
-                     content = SMTPClient.Plain(join(ls[2:end],"\n")),
+                     content = SMTPClient.PlainContent(join(ls[2:end],"\n")),
                      keywords = ["telegram"])
         else
             error(m)
